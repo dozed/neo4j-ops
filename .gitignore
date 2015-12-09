@@ -1,0 +1,13 @@
+target
+project/project
+project/target
+
+.idea
+.idea_modules
+
+/data
+/conf
+
+src/main/resources/application.conf
+src/test/resources/application.conf
+
