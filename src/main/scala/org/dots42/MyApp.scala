@@ -1,49 +1,73 @@
 package org.dots42
 
 import org.dots42.Data._
-import org.dots42.neo4j.Connections.Connection
+import org.dots42.WorldTask._
+import org.dots42.neo4j.Connections.{ConnectionIO, Connection}
+import org.dots42.neo4j.Neo4j
 import org.neo4j.graphdb.GraphDatabaseService
-import org.neo4j.graphdb.factory.GraphDatabaseFactory
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
+
+case class World(db: GraphDatabaseService) {
+
+  def con = Connection(db)
+
+}
+
+object WorldTask {
+
+  type WorldTask[A] = Kleisli[Task[?], World, A]
+
+  def task[A](f: World => Task[A]): Kleisli[Task[?], World, A] = Kleisli[Task[?], World, A](f)
+
+}
+
+
 object MyApp extends App {
 
-  val p = for {
-    xs1 <- Api.listDocuments()
-    doc <- Api.createDocument(Operation.CreateDocument("foo", PrivacyType.Public))
-    xs2 <- Api.listDocuments()
-  } yield (xs1, doc, xs2)
+  val world = World(Neo4j.graphDatabaseService)
 
-  val res = p.run
+  val op = Operation.CreateDocument("foo", PrivacyType.Public)
+
+  // runs in a single transaction
+  val res = Api.listCreateListDocuments(op).run(world).run
   println(res)
+
+  // runs 3 transactions
+  val p2 = for {
+    x <- Api.listDocuments()
+    y <- Api.createDocument(op)
+    z <- Api.listDocuments()
+  } yield (x, y, z)
+
+  val res2 = p2.run(world).run
 
 }
 
 
 object Api {
 
-  def graphDatabaseService: GraphDatabaseService = {
-    new GraphDatabaseFactory()
-      .newEmbeddedDatabaseBuilder(new java.io.File("data/neo4j-2.3.1/data"))
-      .newGraphDatabase()
-
-    // .loadPropertiesFromFile("data/neo4j-2.3.1/neo4j.properties")
+  def listDocuments() = task[List[Document]]{ world =>
+    MyQueries.listDocuments().transact(world.con)
   }
 
-  lazy val db = graphDatabaseService
+  def createDocument(op: Operation.CreateDocument) = task[Document] { world =>
+    MyQueries.createDocument(op.name, op.privacy).transact(world.con)
+  }
 
-  def con = Connection(db)
+  def listCreateListDocuments(op: Operation.CreateDocument) = task[(List[Document], Document, List[Document])] { world =>
+    val p: ConnectionIO[(List[Document], Document, List[Document])] = for {
+      xs1 <- MyQueries.listDocuments()
+      doc <- MyQueries.createDocument(op.name, op.privacy)
+      xs2 <- MyQueries.listDocuments()
+    } yield (xs1, doc, xs2)
 
-  def listDocuments(): Task[List[Document]] = MyQueries.listDocuments().transact(con)
-
-  def createDocument(op: Operation.CreateDocument): Task[Document] = MyQueries.createDocument(op.name, op.privacy).transact(con)
+    p.transact(world.con)
+  }
 
 }
-
-
-
 
 
 object MyQueries {
