@@ -1,5 +1,5 @@
 
-ConnectionIO for Neo4j
+`ConnectionIO[A]` for Neo4j
 
 ```scala
 object Example1 extends App {
