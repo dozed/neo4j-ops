@@ -41,6 +41,7 @@ object Parsers {
   // some concrete parsers/decoders
 
   implicit def stringDecoder: Decoder[String] = decoderByCast[String]
+  implicit def intDecoder: Decoder[Int] = decoderByCast[Int]
 
   implicit val structureTypeDecoder: Decoder[Privacy] = stringDecoder map Privacy.fromString
 
