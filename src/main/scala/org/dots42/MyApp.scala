@@ -18,6 +18,7 @@ case class World(db: GraphDatabaseService) {
 
 object WorldTask {
 
+  // computations are World => Task[A] (fused by Kleisli)
   type WorldTask[A] = Kleisli[Task[?], World, A]
 
   def task[A](f: World => Task[A]): Kleisli[Task[?], World, A] = Kleisli[Task[?], World, A](f)
@@ -27,41 +28,41 @@ object WorldTask {
 
 object MyApp extends App {
 
-  val world = World(Neo4j.graphDatabaseService)
-
-  val op = Operation.CreateDocument("foo", PrivacyType.Public)
-
   // runs in a single transaction
-  val res = Api.listCreateListDocuments(op).run(world).run
-  println(res)
+  val p1 = DocumentModule.listCreateListDocuments("foo", Privacy.Public)
 
-  // runs 3 transactions
+  // each task runs in its own transaction
   val p2 = for {
-    x <- Api.listDocuments()
-    y <- Api.createDocument(op)
-    z <- Api.listDocuments()
+    x <- DocumentModule.listDocuments()
+    y <- DocumentModule.createDocument("foo", Privacy.Public)
+    z <- DocumentModule.listDocuments()
   } yield (x, y, z)
 
+  val world = World(Neo4j.graphDatabaseService)
+  val res1 = p1.run(world).run
   val res2 = p2.run(world).run
+
+  println(res1)
+  println(res2)
 
 }
 
-
-object Api {
+// each function defines a transaction boundary
+object DocumentModule {
 
   def listDocuments() = task[List[Document]]{ world =>
-    MyQueries.listDocuments().transact(world.con)
+    DocumentQueries.listDocuments().transact(world.con)
   }
 
-  def createDocument(op: Operation.CreateDocument) = task[Document] { world =>
-    MyQueries.createDocument(op.name, op.privacy).transact(world.con)
+  def createDocument(name: String, privacy: Privacy) = task[Document] { world =>
+    DocumentQueries.createDocument(name, privacy).transact(world.con)
   }
 
-  def listCreateListDocuments(op: Operation.CreateDocument) = task[(List[Document], Document, List[Document])] { world =>
+  def listCreateListDocuments(name: String, privacy: Privacy) = task[(List[Document], Document, List[Document])] { world =>
     val p: ConnectionIO[(List[Document], Document, List[Document])] = for {
-      xs1 <- MyQueries.listDocuments()
-      doc <- MyQueries.createDocument(op.name, op.privacy)
-      xs2 <- MyQueries.listDocuments()
+      xs1 <- DocumentQueries.listDocuments()
+      doc <- DocumentQueries.createDocument(name, privacy)
+      xs2 <- DocumentQueries.listDocuments()
     } yield (xs1, doc, xs2)
 
     p.transact(world.con)
@@ -70,18 +71,17 @@ object Api {
 }
 
 
-object MyQueries {
+object DocumentQueries {
 
   import neo4j.Connections._
   import neo4j.Queries._
   import neo4j.Parsers._
 
-  val documentParser: Parser[Document] =
-    (parse[String]("id") |@|
-      parse[PrivacyType]("privacyType") |@|
-      parse[String]("name")).tupled.map {
-      case (id, privacyType, name) => Document(id, privacyType, name)
+  val documentParser: Parser[Document] = {
+    (parse[String]("id") |@| parse[Privacy]("privacy") |@| parse[String]("name")).tupled.map {
+      case (id, privacy, name) => Document(id, privacy, name)
     }
+  }
 
   def findDocumentByText(text: String): ConnectionIO[Option[Document]] = {
     query[Document](
@@ -89,25 +89,25 @@ object MyQueries {
         |where d.name =~ ".*{name}.*"
         |return
         |  d.id as id,
-        |  d.privacyType as privacyType,
+        |  d.privacy as privacy,
         |  d.name as name
         | """.stripMargin, Map("text" -> text))(documentParser).option
   }
 
-  def createDocument(name: String, privacyType: PrivacyType): ConnectionIO[Document] = {
+  def createDocument(name: String, privacy: Privacy): ConnectionIO[Document] = {
     val id = generateId
 
     query[Document](
       """create (d:Document {
         |  id: {id},
         |  name: {name},
-        |  privacyType: {privacyType}
+        |  privacy: {privacy}
         |})
         |return
         |  d.id as id,
-        |  d.privacyType as privacyType,
+        |  d.privacy as privacy,
         |  d.name as name
-        | """.stripMargin, Map("id" -> id, "name" -> name, "privacyType" -> privacyType.shows))(documentParser).unique
+        | """.stripMargin, Map("id" -> id, "name" -> name, "privacy" -> privacy.shows))(documentParser).unique
   }
 
   def listDocuments(): ConnectionIO[List[Document]] = {
@@ -117,7 +117,7 @@ object MyQueries {
         |  (d:Document)
         |return
         |  d.id as id,
-        |  d.privacyType as privacyType,
+        |  d.privacy as privacy,
         |  d.name as name
         |""".stripMargin)(documentParser).list
   }

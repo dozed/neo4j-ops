@@ -1,11 +1,8 @@
 package org.dots42.neo4j
 
-import org.dots42.Data.PrivacyType
+import org.dots42.Data.Privacy
 
-import scala.collection.JavaConversions._
-
-import scalaz.Scalaz._
-import scalaz._
+import scalaz._, Scalaz._
 
 object Parsers {
 
@@ -45,7 +42,7 @@ object Parsers {
 
   implicit def stringDecoder: Decoder[String] = decoderByCast[String]
 
-  implicit val structureTypeDecoder: Decoder[PrivacyType] = stringDecoder map PrivacyType.fromString
+  implicit val structureTypeDecoder: Decoder[Privacy] = stringDecoder map Privacy.fromString
 
   implicit val resultItemParser = Parser[ResultItem](identity)
 

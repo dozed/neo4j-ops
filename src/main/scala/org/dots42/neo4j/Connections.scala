@@ -4,8 +4,7 @@ import org.dots42.Data.ErrorCode
 import org.neo4j.graphdb._
 
 import scala.collection.JavaConversions._
-import scalaz.Scalaz._
-import scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object Connections {
