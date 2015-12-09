@@ -20,7 +20,7 @@ object Example1 extends App {
       """.stripMargin, Map("bar" -> bar, "baz" -> baz))(resultItemParser).result
   }
 
-  val p1: Parser[Foo] = (parse[String]("bar") |@| parse[String]("baz")).tupled.map {
+  val fooParser: Parser[Foo] = (parse[String]("bar") |@| parse[String]("baz")).tupled.map {
     case (bar, baz) => Foo(bar, baz)
   }
 
@@ -30,7 +30,7 @@ object Example1 extends App {
       |return
       |  f.bar as bar,
       |  f.baz as baz
-    """.stripMargin)(p1).list
+    """.stripMargin)(fooParser).list
 
 
   val x: ConnectionIO[List[Foo]] = for {
@@ -44,6 +44,7 @@ object Example1 extends App {
   val t: Task[List[Foo]] = x.transact(con(db))
 
   println(t.run)
+  // List(Foo(hey,ho))
 
 }
 ```
