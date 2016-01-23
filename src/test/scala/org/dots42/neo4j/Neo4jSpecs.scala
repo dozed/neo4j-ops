@@ -1,0 +1,74 @@
+package org.dots42.neo4j
+
+import org.dots42.neo4j.Connections._
+import org.dots42.neo4j.Parsers._
+import org.dots42.neo4j.Queries._
+import org.neo4j.graphdb.GraphDatabaseService
+import org.specs2.mutable.Specification
+import org.specs2.specification.BeforeAfterAll
+
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
+
+object TestDomainAndQueries {
+
+  case class Foo(bar: String, baz: String)
+
+  def createFoo(bar: String, baz: String): ConnectionIO[Foo] = {
+    query(
+      """
+        |create (f:Foo {
+        |  bar: {bar},
+        |  baz: {baz}
+        |})
+      """.stripMargin, Map("bar" -> bar, "baz" -> baz)
+    ).result.map(r => {
+      // check for size
+      // r.getQueryStatistics.getNodesCreated == 1
+      Foo(bar, baz)
+    })
+  }
+
+  val queryFoos: ConnectionIO[List[Foo]] = query(
+    """
+      |match (f:Foo)
+      |return
+      |  f.bar as bar,
+      |  f.baz as baz
+    """.stripMargin)(parse2[String, String]("bar", "baz").map(Foo.tupled)
+  ).list
+
+}
+
+class Neo4jSpecs extends Specification with BeforeAfterAll {
+
+  import TestDomainAndQueries._
+
+  val db: GraphDatabaseService = Neo4j.graphDatabaseService
+
+  override def beforeAll(): Unit = {}
+
+  override def afterAll(): Unit = {
+    db.shutdown()
+  }
+
+
+  "it should be possible to create and query foos" in {
+
+    val createAndQuery: ConnectionIO[(Foo, List[Foo])] = for {
+      foo <- createFoo("hey", "ho")
+      xs <- queryFoos
+    } yield (foo, xs)
+
+    val task: Task[(Foo, List[Foo])] = createAndQuery.transact(Connection(db))
+
+    val (foo, foos): (Foo, List[Foo]) = task.run
+
+    foos should not(beEmpty)
+
+    foos should contain(foo)
+
+  }
+
+
+}

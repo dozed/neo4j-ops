@@ -11,7 +11,8 @@ libraryDependencies ++= Seq(
   "org.neo4j" % "neo4j-shell" % "2.3.1",
   "org.scalaz" %% "scalaz-core" % "7.1.2",
   "org.scalaz" %% "scalaz-concurrent" % "7.1.2",
-  "org.scalaz" %% "scalaz-effect" % "7.1.2"
+  "org.scalaz" %% "scalaz-effect" % "7.1.2",
+  "org.specs2" %% "specs2-core" % "3.6.6" % "test"
 )
 
 // https://github.com/non/kind-projector
