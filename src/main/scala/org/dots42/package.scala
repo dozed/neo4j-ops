@@ -6,8 +6,6 @@ import scalaz._, Scalaz._
 
 package object dots42 {
 
-  implicit val pricacyTypeShows = Show.shows[Privacy](x => Privacy.asString(x))
-
   def generateId: String = {
     val x = scala.util.Random.nextDouble
     val l = (java.lang.Long.MAX_VALUE * x).toLong

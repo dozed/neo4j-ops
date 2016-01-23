@@ -77,11 +77,25 @@ object DocumentQueries {
   import neo4j.Queries._
   import neo4j.Parsers._
 
-  val documentParser: Parser[Document] = {
-    (parse[String]("id") |@| parse[Privacy]("privacy") |@| parse[String]("name")).tupled.map {
-      case (id, privacy, name) => Document(id, privacy, name)
-    }
+  // functor parsing
+  val documentParser1: Parser[Document] = {
+    parse3[String, Privacy, String]("id", "privacy", "name").map(Document.tupled)
   }
+
+  // applicative parsing
+  val documentParser: Parser[Document] = {
+    (parse[String]("id") |@| parse[Privacy]("privacy") |@| parse[String]("name"))(Document.apply)
+  }
+
+  // monadic parsing
+  val documentParser2: Parser[Document] = {
+    for {
+      id <- parse[String]("id")
+      privacy <- parse[Privacy]("privacy")
+      name <- parse[String]("name")
+    } yield Document(id, privacy, name)
+  }
+
 
   def findDocumentByText(text: String): ConnectionIO[Option[Document]] = {
     query[Document](
@@ -91,7 +105,8 @@ object DocumentQueries {
         |  d.id as id,
         |  d.privacy as privacy,
         |  d.name as name
-        | """.stripMargin, Map("text" -> text))(documentParser).option
+        | """.stripMargin, Map("text" -> text)
+    )(documentParser).option
   }
 
   def createDocument(name: String, privacy: Privacy): ConnectionIO[Document] = {
@@ -107,7 +122,8 @@ object DocumentQueries {
         |  d.id as id,
         |  d.privacy as privacy,
         |  d.name as name
-        | """.stripMargin, Map("id" -> id, "name" -> name, "privacy" -> privacy.shows))(documentParser).unique
+        | """.stripMargin, Map("id" -> id, "name" -> name, "privacy" -> privacy.shows)
+    )(documentParser).unique
   }
 
   def listDocuments(): ConnectionIO[List[Document]] = {
@@ -119,7 +135,8 @@ object DocumentQueries {
         |  d.id as id,
         |  d.privacy as privacy,
         |  d.name as name
-        |""".stripMargin)(documentParser).list
+        |""".stripMargin
+    )(documentParser).list
   }
 
 }
