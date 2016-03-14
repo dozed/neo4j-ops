@@ -1,6 +1,5 @@
 package org.dots42.neo4j
 
-import org.dots42.Data.ErrorCode
 import org.neo4j.graphdb._
 
 import scala.collection.JavaConversions._
@@ -9,13 +8,16 @@ import scalaz.concurrent.Task
 
 object Connections {
 
-  type ResultItem = Map[String, AnyRef]
+  type ResultItem = Map[String, Any]
 
-  type Params = Map[String, AnyRef]
+  type Params = Map[String, Any]
 
 
   case class Connection(db: GraphDatabaseService) {
     var transaction: Option[Transaction] = None
+    var transactionStart: Long = 0L
+    var queryCount: Int = 0
+    // val log = LoggerFactory.getLogger("Connection")
   }
 
   // connection AST
@@ -24,19 +26,27 @@ object Connections {
   }
 
   case class RunQuery(text: String, params: Params) extends ConnectionOp[Result] {
-    override def run(c: Connection): Result = c.db.execute(text, params)
+    override def run(c: Connection): Result = {
+      c.queryCount += 1
+      //  println()
+      //  println("----------------------------------------------------------------------")
+      //  println("running query")
+      //  println(text)
+      c.db.execute(text, params.asInstanceOf[Map[String, AnyRef]])
+    }
   }
 
   case class StartTx() extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      println(f"StartTx  running in thread: ${java.lang.Thread.currentThread().getId}")
+      // c.log.info(f"StartTx  running in thread: ${java.lang.Thread.currentThread().getId}")
       c.transaction = Some(c.db.beginTx())
+      c.transactionStart = System.currentTimeMillis()
     }
   }
 
   case class SuccessTx() extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      println(f"SuccessTx running in thread: ${java.lang.Thread.currentThread().getId}")
+      // c.log.info(f"SuccessTx running in thread: ${java.lang.Thread.currentThread().getId}")
       c.transaction.foreach { tx =>
         tx.success()
       }
@@ -45,7 +55,7 @@ object Connections {
 
   case class FailureTx() extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      println(f"FailureTx running in thread: ${java.lang.Thread.currentThread().getId}")
+      // c.log.info(f"FailureTx running in thread: ${java.lang.Thread.currentThread().getId}")
       c.transaction.foreach { tx =>
         tx.failure()
       }
@@ -54,11 +64,16 @@ object Connections {
 
   case class CloseTx() extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      println(f"CloseTx running in thread: ${java.lang.Thread.currentThread().getId}")
+      // c.log.info(f"CloseTx running in thread: ${java.lang.Thread.currentThread().getId}")
       val txOpt = c.transaction
+      val queryCount = c.queryCount
+      val deltaSec = (System.currentTimeMillis() - c.transactionStart).toDouble / 1000.0
       c.transaction = None
+      c.queryCount = 0
+      c.transactionStart = 0L
       txOpt.foreach { tx =>
         tx.close()
+        // c.log.info(f"ran $queryCount queries in $deltaSec ms")
       }
     }
   }
@@ -71,18 +86,28 @@ object Connections {
 
 
   type ConnectionEither[E, A] = EitherT[ConnectionIO[?], E, A]
-  type ConnectionWithError[A] = EitherT[ConnectionIO[?], ErrorCode, A]
 
-  implicit class ConnectionIOExt[A](c: ConnectionIO[Option[A]]) {
-    def \/>[E](e: => ConnectionIO[E]): ConnectionEither[E, A] = EitherT[ConnectionIO[?], E, A] {
+  implicit class ConnectionIOExt[A](c: ConnectionIO[A]) {
+
+    // a ConnectionIO[Option[A]] and ConnectionIO[E] as EitherT[ConnectionIO[?], E, A]
+    def \/>[B, E](e: => ConnectionIO[E])(implicit ev: A <:< Option[B]): ConnectionEither[E, B] = EitherT[ConnectionIO[?], E, B] {
       c flatMap { x =>
-        x match {
+        ev(x) match {
           case Some(v) => v.right.point[ConnectionIO]
           case None => e.map(_.left)
         }
       }
     }
+
+
+    // a ConnectionIO[Option[A]] as OptionT[ConnectionIO[?], A]
+    def asOptT[B](implicit ev: A <:< Option[B]): OptionT[ConnectionIO[?], B] = OptionT[ConnectionIO[?], B](c map ev.apply)
+
+    // a ConnectionIO[A] as OptionT[ConnectionIO[?], A]
+    def liftOptT: OptionT[ConnectionIO[?], A] = OptionT[ConnectionIO[?], A](c map (_.some))
+
   }
+
 
   val interp: ConnectionOp ~> Reader[Connection, ?] = new (ConnectionOp ~> Reader[Connection, ?]) {
     override def apply[A](a: ConnectionOp[A]): Reader[Connection, A] = {
@@ -122,8 +147,3 @@ object Connections {
   def closeTx: ConnectionIO[Unit] = Free.liftFC(CloseTx())
 
 }
-
-
-
-
-

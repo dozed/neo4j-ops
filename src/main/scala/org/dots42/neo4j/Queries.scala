@@ -5,46 +5,43 @@ import org.neo4j.graphdb.{QueryStatistics, Result}
 import scala.collection.JavaConversions._
 import scala.collection.generic.CanBuildFrom
 import scala.util.Try
-import scalaz.Scalaz._
-import scalaz._
+import scalaz._, Scalaz._
 
 object Queries {
 
   import Connections._
   import Parsers._
 
-  // ConnectionIO[A] combinators
-  trait Query[B] {
+  trait Query {
 
-    def to[F[_]](implicit cbf: CanBuildFrom[Nothing, B, F[B]]): ConnectionIO[F[B]]
+    def to[B, F[_]](implicit parser: Parser[B], cbf: CanBuildFrom[Nothing, B, F[B]]): ConnectionIO[F[B]]
 
-    def unique: ConnectionIO[B]
+    def unique[B](implicit parser: Parser[B]): ConnectionIO[B]
 
-    def option: ConnectionIO[Option[B]]
+    def option[B](implicit parser: Parser[B]): ConnectionIO[Option[B]]
 
-    def list: ConnectionIO[List[B]] = to[List]
+    def list[B](implicit parser: Parser[B]): ConnectionIO[List[B]] = to[B, List]
 
     def result: ConnectionIO[Result]
 
-    def map[C](f: B => C): Query[C]
+    def unit: ConnectionIO[Unit]
 
   }
 
-  case class ResultChecker(p: QueryStatistics => Boolean)
+  // TODO
+  // case class ResultChecker(p: QueryStatistics => Boolean)
 
-  //  implicit val queryFunctor = new Functor[Query] {
-  //    override def map[A, B](fa: Query[A])(f: (A) => B): Query[B] = ???
-  //  }
+  def query(text: String, params: Params = Map.empty): Query = new Query {
 
+    def text1 = text
 
-  // takes a Parser, should also take a result checker
-  def query[B:Parser](text: String, params: Params = Map.empty): Query[B] = new Query[B] {
-
-    lazy val parser = implicitly[Parser[B]]
+    def params1 = params
 
     override def result: ConnectionIO[Result] = runQuery(text, params)
 
-    override def to[F[_]](implicit cbf: CanBuildFrom[Nothing, B, F[B]]): ConnectionIO[F[B]] = {
+    override def unit: ConnectionIO[Unit] = result map (_ => ())
+
+    override def to[B, F[_]](implicit parser: Parser[B], cbf: CanBuildFrom[Nothing, B, F[B]]): ConnectionIO[F[B]] = {
       result map { r =>
         val builder = cbf.apply()
 
@@ -61,7 +58,7 @@ object Queries {
       }
     }
 
-    override def unique: ConnectionIO[B] = result map { r =>
+    override def unique[B](implicit parser: Parser[B]): ConnectionIO[B] = result map { r =>
       if (r.hasNext) {
         val b = parser.run(r.next.toMap)
         if (r.hasNext) throw new Error("Result set is not unique (more than one rows)")
@@ -70,7 +67,7 @@ object Queries {
       else throw new Error("Result set is not unique (empty)")
     }
 
-    override def option: ConnectionIO[Option[B]] = result map { r =>
+    override def option[B](implicit parser: Parser[B]): ConnectionIO[Option[B]] = result map { r =>
       if (r.isEmpty) None
       else {
         val b = Try(parser.run(r.next.toMap)).toOption
@@ -79,51 +76,9 @@ object Queries {
       }
     }
 
-    override def map[C](f: (B) => C): Query[C] = Queries.query[C](text, params)(parser.map(f))
-
   }
 
 
-  def checkedQuery[B:Parser](text: String, params: Params = Map.empty)(check: ResultChecker): Query[B] = new Query[B] {
-
-    lazy val parser = implicitly[Parser[B]]
-
-    override def result: ConnectionIO[Result] = runQuery(text, params) map { r => check.p(r.getQueryStatistics); r }
-
-    override def to[F[_]](implicit cbf: CanBuildFrom[Nothing, B, F[B]]): ConnectionIO[F[B]] = {
-      result map { r =>
-        val builder = cbf.apply()
-
-        while (r.hasNext) {
-          builder += parser.run(r.next.toMap)
-        }
-
-        builder.result()
-      }
-    }
-
-    override def unique: ConnectionIO[B] = result map { r =>
-      if (r.hasNext) {
-        val b = parser.run(r.next.toMap)
-        if (r.hasNext) throw new Error("Result set is not unique (more than one rows)")
-        b
-      }
-      else throw new Error("Result set is not unique (empty)")
-    }
-
-    override def option: ConnectionIO[Option[B]] = result map { r =>
-      if (r.isEmpty) None
-      else {
-        val b = Try(parser.run(r.next.toMap)).toOption
-        if (r.hasNext) throw new Error("Result set is not unique (more than one rows)")
-        b
-      }
-    }
-
-
-    override def map[C](f: (B) => C): Query[C] = Queries.query[C](text, params)(parser.map(f))
-
-  }
 
 
 }

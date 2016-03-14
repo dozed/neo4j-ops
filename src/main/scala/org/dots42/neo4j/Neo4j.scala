@@ -7,12 +7,16 @@ import scalaz._, Scalaz._
 
 object Neo4j {
 
-  def graphDatabaseService: GraphDatabaseService = {
+  def graphDatabaseService(store: String, properties: String): GraphDatabaseService = {
     new GraphDatabaseFactory()
-      .newEmbeddedDatabaseBuilder(new java.io.File("data/neo4j-2.3.1/data"))
+      .newEmbeddedDatabaseBuilder(new java.io.File(store))
+      .loadPropertiesFromFile(properties)
       .newGraphDatabase()
-
-    // .loadPropertiesFromFile("data/neo4j-2.3.1/neo4j.properties")
   }
 
+  def graphDatabaseService(store: String): GraphDatabaseService = {
+    new GraphDatabaseFactory()
+      .newEmbeddedDatabaseBuilder(new java.io.File(store))
+      .newGraphDatabase()
+  }
 }

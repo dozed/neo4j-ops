@@ -23,7 +23,7 @@ object Example2 extends App {
     z <- DocumentModule.listDocuments()
   } yield (x, y, z)
 
-  val world = World(Neo4j.graphDatabaseService)
+  val world = World(Neo4j.graphDatabaseService("data/neo4jdb"))
   val res1 = p1.run(world).run
   val res2 = p2.run(world).run
 
@@ -98,7 +98,7 @@ object DocumentQueries {
 
 
   def findDocumentByText(text: String): ConnectionIO[Option[Document]] = {
-    query[Document](
+    query(
       """match (d:Document)
         |where d.name =~ ".*{name}.*"
         |return
@@ -106,13 +106,13 @@ object DocumentQueries {
         |  d.privacy as privacy,
         |  d.name as name
         | """.stripMargin, Map("text" -> text)
-    )(documentParser).option
+    ).option[Document](documentParser)
   }
 
   def createDocument(name: String, privacy: Privacy): ConnectionIO[Document] = {
     val id = generateId
 
-    query[Document](
+    query(
       """create (d:Document {
         |  id: {id},
         |  name: {name},
@@ -123,11 +123,11 @@ object DocumentQueries {
         |  d.privacy as privacy,
         |  d.name as name
         | """.stripMargin, Map("id" -> id, "name" -> name, "privacy" -> privacy.shows)
-    )(documentParser).unique
+    ).unique[Document](documentParser)
   }
 
   def listDocuments(): ConnectionIO[List[Document]] = {
-    query[Document](
+    query(
       """
         |match
         |  (d:Document)
@@ -136,7 +136,7 @@ object DocumentQueries {
         |  d.privacy as privacy,
         |  d.name as name
         |""".stripMargin
-    )(documentParser).list
+    ).list[Document](documentParser)
   }
 
 }

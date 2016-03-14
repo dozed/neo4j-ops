@@ -1,6 +1,26 @@
 
 `ConnectionIO[A]` for Neo4j
 
+Goals:
+
+  - run and compose database queries as IO
+  - isolate side effects
+  - build queries
+  - decode result with composable parsers based on decoder primitives
+
+Types
+
+  - `Decoder[A]`       `Any => A`
+  - `Query`            together with a `Decoder[A]` yields a `ConnectionIO[A]`, `ConnectionIO[Option[A]]` or `ConnectionIO[List[A]]`
+  - `ConnectionIO[A]`  usually contains runs a database query over a database connection
+  - `ConnectionOp ~> Reader[Connection, ?]`   interpreter which transform a `ConnectionOp` AST to a program which runs the ConnectionOp over a give database `Connection`
+
+Future improvements
+
+  - improve parsers and decoders
+  - use neo4j REST and/or Bolt protocol
+
+
 ```scala
 object Example1 extends App {
 
@@ -17,10 +37,10 @@ object Example1 extends App {
         |  bar: {bar},
         |  baz: {baz}
         |})
-      """.stripMargin, Map("bar" -> bar, "baz" -> baz))(resultItemParser).result
+      """.stripMargin, Map("bar" -> bar, "baz" -> baz)).result
   }
 
-  val fooParser: Parser[Foo] = (parse[String]("bar") |@| parse[String]("baz")).tupled.map {
+  implicit val fooParser: Parser[Foo] = (parse[String]("bar") |@| parse[String]("baz")).tupled.map {
     case (bar, baz) => Foo(bar, baz)
   }
 
@@ -30,7 +50,7 @@ object Example1 extends App {
       |return
       |  f.bar as bar,
       |  f.baz as baz
-    """.stripMargin)(fooParser).list
+    """.stripMargin).list
 
 
   val x: ConnectionIO[List[Foo]] = for {
@@ -51,6 +71,3 @@ object Example1 extends App {
 
 
 
-TODO
-
-  - improve parsers

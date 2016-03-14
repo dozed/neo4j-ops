@@ -21,7 +21,7 @@ object Example1 extends App {
         |  bar: {bar},
         |  baz: {baz}
         |})
-      """.stripMargin, Map("bar" -> bar, "baz" -> baz))(resultItemParser).result
+      """.stripMargin, Map("bar" -> bar, "baz" -> baz)).result
   }
 
   val fooParser: Parser[Foo] = (parse[String]("bar") |@| parse[String]("baz")).tupled.map {
@@ -34,7 +34,7 @@ object Example1 extends App {
       |return
       |  f.bar as bar,
       |  f.baz as baz
-    """.stripMargin)(fooParser).list
+    """.stripMargin).list(fooParser)
 
 
   val x: ConnectionIO[List[Foo]] = for {
@@ -42,7 +42,7 @@ object Example1 extends App {
     xs <- listFoos
   } yield xs
 
-  val db = Neo4j.graphDatabaseService
+  val db = Neo4j.graphDatabaseService("data/neo4jdb")
   def con(db: GraphDatabaseService): Connection = Connection(db)
 
   val t: Task[List[Foo]] = x.transact(con(db))

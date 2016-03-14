@@ -10,7 +10,7 @@ object Decoders {
     def run: I => A
   }
 
-  case class Decoder[A](run: AnyRef => A) extends DecoderGen[AnyRef, A]
+  case class Decoder[A](run: Any => A) extends DecoderGen[Any, A]
 
   implicit val decoderFunctor = new Functor[Decoder] {
     override def map[A, B](fa: Decoder[A])(f: (A) => B): Decoder[B] = Decoder[B](x => f(fa.run(x)))
@@ -19,7 +19,7 @@ object Decoders {
 
   def decoderByCast[A]: Decoder[A] = Decoder[A](_.asInstanceOf[A])
 
-  def decoder[A](f: AnyRef => A): Decoder[A] = Decoder[A](f)
+  def decoder[A](f: Any => A): Decoder[A] = Decoder[A](f)
 
 
   // some concrete decoders
@@ -30,6 +30,10 @@ object Decoders {
   implicit def intDecoder: Decoder[Int] = decoderByCast[Int]
   implicit def optionalDecoder[A:Decoder]: Decoder[Option[A]] = Decoder { any =>
     Try(implicitly[Decoder[A]].run(any)).toOption.filterNot(_ == null)
+  }
+  implicit def listDecoder[A:Decoder]: Decoder[List[A]] = decoderByCast[Array[AnyRef]] map { xs =>
+    val decoder = implicitly[Decoder[A]]
+    xs.toList map decoder.run
   }
 
 }

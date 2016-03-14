@@ -22,11 +22,7 @@ object TestDomainAndQueries {
         |  baz: {baz}
         |})
       """.stripMargin, Map("bar" -> bar, "baz" -> baz)
-    ).result.map(r => {
-      // check for size
-      // r.getQueryStatistics.getNodesCreated == 1
-      Foo(bar, baz)
-    })
+    ).unique(Foo(bar, baz).point[Parser])
   }
 
   val queryFoos: ConnectionIO[List[Foo]] = query(
@@ -35,8 +31,7 @@ object TestDomainAndQueries {
       |return
       |  f.bar as bar,
       |  f.baz as baz
-    """.stripMargin)(parse2[String, String]("bar", "baz").map(Foo.tupled)
-  ).list
+    """.stripMargin).list(parse2[String, String]("bar", "baz").map(Foo.tupled))
 
 }
 
@@ -44,7 +39,7 @@ class Neo4jSpecs extends Specification with BeforeAfterAll {
 
   import TestDomainAndQueries._
 
-  val db: GraphDatabaseService = Neo4j.graphDatabaseService
+  val db: GraphDatabaseService = Neo4j.graphDatabaseService("data/neo4jdb")
 
   override def beforeAll(): Unit = {}
 
