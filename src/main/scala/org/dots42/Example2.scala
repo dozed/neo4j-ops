@@ -51,11 +51,11 @@ object WorldTask {
 object DocumentModule {
 
   def listDocuments() = task[List[Document]]{ world =>
-    DocumentQueries.listDocuments().transact(world.con)
+    DocumentQueries.listDocuments().task(world.con)
   }
 
   def createDocument(name: String, privacy: Privacy) = task[Document] { world =>
-    DocumentQueries.createDocument(name, privacy).transact(world.con)
+    DocumentQueries.createDocument(name, privacy).task(world.con)
   }
 
   def listCreateListDocuments(name: String, privacy: Privacy) = task[(List[Document], Document, List[Document])] { world =>
@@ -65,7 +65,7 @@ object DocumentModule {
       xs2 <- DocumentQueries.listDocuments()
     } yield (xs1, doc, xs2)
 
-    p.transact(world.con)
+    p.task(world.con)
   }
 
 }

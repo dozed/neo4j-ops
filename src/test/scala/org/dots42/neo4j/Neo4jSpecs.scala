@@ -55,7 +55,7 @@ class Neo4jSpecs extends Specification with BeforeAfterAll {
       xs <- queryFoos
     } yield (foo, xs)
 
-    val task: Task[(Foo, List[Foo])] = createAndQuery.transact(Connection(db))
+    val task: Task[(Foo, List[Foo])] = createAndQuery.task(Connection(db))
 
     val (foo, foos): (Foo, List[Foo]) = task.run
 

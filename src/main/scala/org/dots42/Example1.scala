@@ -45,7 +45,7 @@ object Example1 extends App {
   val db = Neo4j.graphDatabaseService("data/neo4jdb")
   def con(db: GraphDatabaseService): Connection = Connection(db)
 
-  val t: Task[List[Foo]] = x.transact(con(db))
+  val t: Task[List[Foo]] = x.task(con(db))
 
   println(t.run)
   // List(Foo(hey,ho))

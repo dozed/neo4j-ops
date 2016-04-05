@@ -119,7 +119,7 @@ object Connections {
       c.map(x => x.right)
     }
 
-    def transact(con: Connection): Task[A] = {
+    def transact: Reader[Connection, A] = {
       val p: ConnectionIO[A] = for {
         _ <- startTx
         r <- c
@@ -127,10 +127,11 @@ object Connections {
         _ <- closeTx
       } yield r
 
-      Task {
-        p.foldMap[Reader[Connection, ?]](interp).run(con)
-      }
+      p.foldMap[Reader[Connection, ?]](interp)
     }
+
+    def task(con: Connection): Task[A] = Task(c.transact(con))
+
   }
 
   // just print the ConnectionOps of the ConnectionIO
