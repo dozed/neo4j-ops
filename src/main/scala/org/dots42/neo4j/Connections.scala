@@ -80,9 +80,8 @@ object Connections {
 
 
   // free/operational monad over AST
-  type ConnectionIO[A] = Free.FreeC[ConnectionOp, A]
-
-  implicit val MonadConnectionIO: Monad[ConnectionIO] = Free.freeMonad[Coyoneda[ConnectionOp, ?]]
+  type ConnectionIO[A] = Free[ConnectionOp, A]
+  implicit val MonadConnectionIO: Monad[ConnectionIO] = Free.freeMonad[ConnectionOp]
 
 
   type ConnectionEither[E, A] = EitherT[ConnectionIO[?], E, A]
@@ -121,7 +120,7 @@ object Connections {
     }
 
     def transact(con: Connection): Task[A] = {
-      val p = for {
+      val p: ConnectionIO[A] = for {
         _ <- startTx
         r <- c
         _ <- successTx
@@ -129,7 +128,7 @@ object Connections {
       } yield r
 
       Task {
-        Free.runFC[ConnectionOp, Reader[Connection, ?], A](p)(interp).run(con)
+        p.foldMap[Reader[Connection, ?]](interp).run(con)
       }
     }
   }
@@ -140,10 +139,10 @@ object Connections {
   }
 
   // ConnectionIO[Result] constructor
-  def runQuery(text: String, params: Params): ConnectionIO[org.neo4j.graphdb.Result] = Free.liftFC(RunQuery(text, params))
-  def startTx: ConnectionIO[Unit] = Free.liftFC(StartTx())
-  def successTx: ConnectionIO[Unit] = Free.liftFC(SuccessTx())
-  def failureTx: ConnectionIO[Unit] = Free.liftFC(FailureTx())
-  def closeTx: ConnectionIO[Unit] = Free.liftFC(CloseTx())
+  def runQuery(text: String, params: Params): ConnectionIO[org.neo4j.graphdb.Result] = Free.liftF(RunQuery(text, params))
+  def startTx: ConnectionIO[Unit]   = Free.liftF(StartTx())
+  def successTx: ConnectionIO[Unit] = Free.liftF(SuccessTx())
+  def failureTx: ConnectionIO[Unit] = Free.liftF(FailureTx())
+  def closeTx: ConnectionIO[Unit]   = Free.liftF(CloseTx())
 
 }
