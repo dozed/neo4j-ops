@@ -15,6 +15,8 @@ libraryDependencies ++= Seq(
   "org.specs2" %% "specs2-core" % "3.6.6" % "test"
 )
 
+exportJars := true
+
 // https://github.com/non/kind-projector
 // makes writing type signatures easier
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.7.1")
