@@ -4,13 +4,17 @@ import scala.util.Try
 import scalaz._, Scalaz._
 
 // Decoder[A] converts from Any to A
-object Decoders {
+trait DecoderTypes {
 
   trait DecoderGen[I, A] {
     def run: I => A
   }
 
   case class Decoder[A](run: Any => A) extends DecoderGen[Any, A]
+
+}
+
+trait Decoders {
 
   implicit val decoderFunctor = new Functor[Decoder] {
     override def map[A, B](fa: Decoder[A])(f: (A) => B): Decoder[B] = Decoder[B](x => f(fa.run(x)))

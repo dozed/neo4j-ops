@@ -4,18 +4,15 @@ import scala.util.Try
 import scalaz._, Scalaz._
 
 // Parser[A] converts from Map[String, Any] to A
-// - decoders
-// - 1-step navigation
-object Parsers {
-
-  import Connections._
-  import Decoders._
+trait ParserTypes {
 
   trait ParseGen[I, A]
 
   case class Parser[A](run: ResultItem => A) extends ParseGen[ResultItem, A]
 
+}
 
+trait Parsers {
 
   implicit val parserMonad = new Monad[Parser] {
     override def point[A](a: => A): Parser[A] = Parser[A](_ => a)
@@ -33,12 +30,18 @@ object Parsers {
 
   implicit val unitParser = ().point[Parser]
 
-  // primitive parser (+1-step traversal)
+  implicit def decoderParser[A](implicit parser: Parser[A]): Decoder[A] = Decoder.apply {
+    any =>
+      // TODO
+      import scala.collection.JavaConversions._
+      parser.run(any.asInstanceOf[java.util.Map[String, AnyRef]].toMap)
+  }
+
+  // single field value
   def parse[A: Decoder](key: String): Parser[A] = Parser[A] { m =>
     implicitly[Decoder[A]].run(m(key))
   }
 
-  // -> ParseResult and |
   def parseOrElse[A: Decoder](key: String, default: A): Parser[A] = Parser[A] { m =>
     Try(implicitly[Decoder[A]].run(m(key))).getOrElse(default)
   }

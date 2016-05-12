@@ -1,16 +1,13 @@
-package org.dots42
+package examples
 
-import org.dots42.Data._
-import org.dots42.WorldTask._
-import org.dots42.neo4j.Connections.{ConnectionIO, Connection}
-import org.dots42.neo4j.Neo4j
-import org.neo4j.graphdb.GraphDatabaseService
+import Data._
+
+import org.dots42.neo4j._
+import org.neo4j.driver.v1.Driver
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-
-// computations are World => Task[A] (fused by Kleisli)
 object Example2 extends App {
 
   // runs in a single transaction
@@ -23,26 +20,58 @@ object Example2 extends App {
     z <- DocumentModule.listDocuments()
   } yield (x, y, z)
 
-  val world = World(Neo4j.graphDatabaseService("data/neo4jdb"))
-  val res1 = p1.run(world).run
-  val res2 = p2.run(world).run
+  val world = World(Neo4j.driver)
+  val res1 = p1.run(world).unsafePerformSync
+  val res2 = p2.run(world).unsafePerformSync
 
   println(res1)
   println(res2)
 
 }
 
-case class World(db: GraphDatabaseService) {
+case class World(driver: Driver) {
 
-  def con = Connection(db)
+  def con = Connection(driver.session)
 
 }
 
-object WorldTask {
+object Def {
 
-  type WorldTask[A] = Kleisli[Task[?], World, A]
+  type RT[A] = Kleisli[Task[?], World, A]
 
-  def task[A](f: World => Task[A]): Kleisli[Task[?], World, A] = Kleisli[Task[?], World, A](f)
+  def apply[A](f: World => Task[A]): RT[A] = Kleisli[Task[?], World, A](f)
+
+}
+
+object Data {
+
+  sealed trait Privacy
+
+  object Privacy {
+
+    case object Public extends Privacy
+    case object Private extends Privacy
+
+    def fromString(s: String): Privacy = s match {
+      case "public" => Public
+      case "private" => Private
+    }
+
+    def asString(p: Privacy) = p match {
+      case Public => "public"
+      case Private => "private"
+    }
+
+  }
+
+  case class Document(id: String, privacyType: Privacy, name: String)
+
+  sealed trait ErrorCode
+
+
+  implicit val privacyTypeDecoder: Decoder[Privacy] = stringDecoder map Privacy.fromString
+
+  implicit val pricacyTypeShows = Show.shows[Privacy](x => Privacy.asString(x))
 
 }
 
@@ -50,32 +79,26 @@ object WorldTask {
 // each function defines a transaction boundary
 object DocumentModule {
 
-  def listDocuments() = task[List[Document]]{ world =>
+  def listDocuments() = Def[List[Document]]{ world =>
     DocumentQueries.listDocuments().task(world.con)
   }
 
-  def createDocument(name: String, privacy: Privacy) = task[Document] { world =>
+  def createDocument(name: String, privacy: Privacy) = Def[Document] { world =>
     DocumentQueries.createDocument(name, privacy).task(world.con)
   }
 
-  def listCreateListDocuments(name: String, privacy: Privacy) = task[(List[Document], Document, List[Document])] { world =>
-    val p: ConnectionIO[(List[Document], Document, List[Document])] = for {
+  def listCreateListDocuments(name: String, privacy: Privacy) = Def[(List[Document], Document, List[Document])] { world =>
+    (for {
       xs1 <- DocumentQueries.listDocuments()
       doc <- DocumentQueries.createDocument(name, privacy)
       xs2 <- DocumentQueries.listDocuments()
-    } yield (xs1, doc, xs2)
-
-    p.task(world.con)
+    } yield (xs1, doc, xs2)).task(world.con)
   }
 
 }
 
 
 object DocumentQueries {
-
-  import neo4j.Connections._
-  import neo4j.Queries._
-  import neo4j.Parsers._
 
   // functor parsing
   val documentParser1: Parser[Document] = {
@@ -105,12 +128,13 @@ object DocumentQueries {
         |  d.id as id,
         |  d.privacy as privacy,
         |  d.name as name
-        | """.stripMargin, Map("text" -> text)
+        | """.stripMargin,
+      Map("text" -> text)
     ).option[Document](documentParser)
   }
 
   def createDocument(name: String, privacy: Privacy): ConnectionIO[Document] = {
-    val id = generateId
+    val id = java.util.UUID.randomUUID().toString
 
     query(
       """create (d:Document {
@@ -122,7 +146,8 @@ object DocumentQueries {
         |  d.id as id,
         |  d.privacy as privacy,
         |  d.name as name
-        | """.stripMargin, Map("id" -> id, "name" -> name, "privacy" -> privacy.shows)
+        | """.stripMargin,
+      Map("id" -> id, "name" -> name, "privacy" -> privacy.shows)
     ).unique[Document](documentParser)
   }
 
