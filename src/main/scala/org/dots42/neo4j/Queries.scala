@@ -58,7 +58,7 @@ trait Queries {
       }
     }
 
-    override def point[B](b: B): ConnectionIO[B] = b.point[ConnectionIO]
+    override def point[B](b: B): ConnectionIO[B] = result.map(_ => b)
 
     override def unique[B:Parser]: ConnectionIO[B] = result map { rs =>
       if (rs.hasNext) {
