@@ -1,16 +1,20 @@
 package org.dots42.neo4j
 
-import org.neo4j.driver.v1.StatementResult
+import java.util
+
+import org.neo4j.driver.v1.{Record, StatementResult}
 import org.neo4j.driver.v1.summary.ResultSummary
+import org.neo4j.driver.v1.util.Function
 
 import scala.collection.JavaConversions._
 import scala.collection.generic.CanBuildFrom
 import scala.util.Try
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 
 trait Queries {
 
-  trait Query {
+  trait Query { query =>
 
     def result: ConnectionIO[StatementResult]
 

@@ -6,18 +6,33 @@ import scalaz._, Scalaz._
 // Parser[A] converts from Map[String, Any] to A
 trait ParserTypes {
 
-  trait ParseGen[I, A]
+  trait ParseGen[I, A] {
+    def run: I => A
+  }
 
-  case class Parser[A](run: ResultItem => A) extends ParseGen[ResultItem, A]
+  trait Parser[A] extends ParseGen[ResultItem, A] {
+    def run: ResultItem => A
+  }
+
+  object Parser {
+
+    def apply[A:Parser]: Parser[A] = implicitly[Parser[A]]
+
+    def instance[A](f: ResultItem => A): Parser[A] = new Parser[A] {
+      override def run: (ResultItem) => A = rs => f(rs)
+    }
+
+  }
+
 
 }
 
 trait Parsers {
 
   implicit val parserMonad = new Monad[Parser] {
-    override def point[A](a: => A): Parser[A] = Parser[A](_ => a)
+    override def point[A](a: => A): Parser[A] = Parser.instance[A](_ => a)
 
-    override def bind[A, B](fa: Parser[A])(f: (A) => Parser[B]): Parser[B] = Parser[B] { res =>
+    override def bind[A, B](fa: Parser[A])(f: (A) => Parser[B]): Parser[B] = Parser.instance[B] { res =>
       val a = fa.run(res)
       val b = f(a).run(res)
       b
@@ -26,11 +41,11 @@ trait Parsers {
 
 
   // default parser
-  implicit val resultItemParser = Parser[ResultItem](identity)
+  implicit val resultItemParser = Parser.instance[ResultItem](identity)
 
   implicit val unitParser = ().point[Parser]
 
-  implicit def decoderParser[A](implicit parser: Parser[A]): Decoder[A] = Decoder.apply {
+  implicit def decoderParser[A](implicit parser: Parser[A]): Decoder[A] = Decoder.instance[A] {
     any =>
       // TODO
       import scala.collection.JavaConversions._
@@ -38,16 +53,16 @@ trait Parsers {
   }
 
   // single field value
-  def parse[A: Decoder](key: String): Parser[A] = Parser[A] { m =>
-    implicitly[Decoder[A]].run(m(key))
+  def parse[A: Decoder](key: String): Parser[A] = Parser.instance[A] { m =>
+    Decoder[A].run(m(key))
   }
 
-  def parseOrElse[A: Decoder](key: String, default: A): Parser[A] = Parser[A] { m =>
-    Try(implicitly[Decoder[A]].run(m(key))).getOrElse(default)
+  def parseOrElse[A: Decoder](key: String, default: A): Parser[A] = Parser.instance[A] { m =>
+    Try(Decoder[A].run(m(key))).getOrElse(default)
   }
 
   implicit class ParserExt[A](p: Parser[A]) {
-    def |(q: => Parser[A]): Parser[A] = Parser[A] { m =>
+    def |(q: => Parser[A]): Parser[A] = Parser.instance[A] { m =>
       Try(p.run(m)).filter(_ != null).getOrElse(q.run(m))
     }
   }

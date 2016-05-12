@@ -13,9 +13,9 @@ import scalaz.concurrent.Task
 
 trait ConnectionTypes {
 
-  type ResultItem = Map[String, AnyRef]
+  type ResultItem = Map[String, Any]
 
-  type Params = Map[String, AnyRef]
+  type Params = Map[String, Any]
 
 
   case class Connection(session: Session) {
@@ -36,7 +36,7 @@ trait ConnectionTypes {
       println(s"running query: text=$text params=$params")
 
       // run either on the session or in the transaction
-      c.transaction.fold(c.session.run(text, params))(t => t.run(text, params))
+      c.transaction.fold(c.session.run(text, params.asInstanceOf[Map[String, AnyRef]]))(t => t.run(text, params.asInstanceOf[Map[String, AnyRef]]))
 
     }
   }

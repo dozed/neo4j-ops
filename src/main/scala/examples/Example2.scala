@@ -69,7 +69,7 @@ object Data {
   sealed trait ErrorCode
 
 
-  implicit val privacyTypeDecoder: Decoder[Privacy] = stringDecoder map Privacy.fromString
+  implicit val privacyTypeDecoder: Decoder[Privacy] = Decoder[String] map Privacy.fromString
 
   implicit val pricacyTypeShows = Show.shows[Privacy](x => Privacy.asString(x))
 
