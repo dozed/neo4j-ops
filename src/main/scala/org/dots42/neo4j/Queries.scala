@@ -1,11 +1,13 @@
 package org.dots42.neo4j
 
+import org.dots42.neo4j.Decoders.Decoder
 import org.neo4j.graphdb.{QueryStatistics, Result}
 
 import scala.collection.JavaConversions._
 import scala.collection.generic.CanBuildFrom
 import scala.util.Try
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 
 object Queries {
 
@@ -25,6 +27,8 @@ object Queries {
     def result: ConnectionIO[Result]
 
     def unit: ConnectionIO[Unit]
+
+    def single[B:Decoder](key: String): ConnectionIO[B] = unique(parse1[B](key))
 
   }
 
