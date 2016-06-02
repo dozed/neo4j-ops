@@ -29,7 +29,8 @@ object Decoders {
   implicit def booleanDecoder: Decoder[Boolean] = decoderByCast[Boolean]
   implicit def intDecoder: Decoder[Int] = decoderByCast[Int]
   implicit def optionalDecoder[A:Decoder]: Decoder[Option[A]] = Decoder { any =>
-    Try(implicitly[Decoder[A]].run(any)).toOption.filterNot(_ == null)
+    if (any == null) None
+    else Try(implicitly[Decoder[A]].run(any)).toOption.filterNot(_ == null)
   }
   implicit def listDecoder[A:Decoder]: Decoder[List[A]] = decoderByCast[Array[AnyRef]] map { xs =>
     val decoder = implicitly[Decoder[A]]
