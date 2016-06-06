@@ -16,19 +16,21 @@ object Queries {
 
   trait Query {
 
+    def result: ConnectionIO[Result]
+
+    def unit: ConnectionIO[Unit]
+
     def to[B, F[_]](implicit parser: Parser[B], cbf: CanBuildFrom[Nothing, B, F[B]]): ConnectionIO[F[B]]
+
+    def point[B](b: B): ConnectionIO[B] = b.point[ConnectionIO]
+
+    def single[B:Decoder](key: String): ConnectionIO[B] = unique(parse1[B](key))
 
     def unique[B](implicit parser: Parser[B]): ConnectionIO[B]
 
     def option[B](implicit parser: Parser[B]): ConnectionIO[Option[B]]
 
     def list[B](implicit parser: Parser[B]): ConnectionIO[List[B]] = to[B, List]
-
-    def result: ConnectionIO[Result]
-
-    def unit: ConnectionIO[Unit]
-
-    def single[B:Decoder](key: String): ConnectionIO[B] = unique(parse1[B](key))
 
   }
 
