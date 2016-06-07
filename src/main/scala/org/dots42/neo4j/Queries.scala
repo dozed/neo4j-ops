@@ -22,7 +22,7 @@ object Queries {
 
     def to[B, F[_]](implicit parser: Parser[B], cbf: CanBuildFrom[Nothing, B, F[B]]): ConnectionIO[F[B]]
 
-    def point[B](b: B): ConnectionIO[B] = b.point[ConnectionIO]
+    def point[B](b: B): ConnectionIO[B] = result.map(_ => b)
 
     def single[B:Decoder](key: String): ConnectionIO[B] = unique(parse1[B](key))
 
