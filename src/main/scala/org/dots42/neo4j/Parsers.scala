@@ -33,7 +33,14 @@ object Parsers {
 
   implicit val unitParser = ().point[Parser]
 
-  // primitive parser (+1-step traversal)
+  implicit def parserDecoder[A](implicit parser: Parser[A]): Decoder[A] = Decoder[A] {
+    any =>
+      val map = any.asInstanceOf[Map[String, Any]]
+      parser.run(map)
+  }
+
+
+  // primitive parser (1-step traversal)
   def parse[A: Decoder](key: String): Parser[A] = Parser[A] { m =>
     implicitly[Decoder[A]].run(m(key))
   }
