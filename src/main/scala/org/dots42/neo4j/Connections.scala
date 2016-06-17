@@ -88,6 +88,8 @@ object Connections {
 
   implicit class ConnectionIOExt[A](c: ConnectionIO[A]) {
 
+    def >>[B](c2: ConnectionIO[B]): ConnectionIO[B] = c flatMap (_ => c2)
+
     // a ConnectionIO[Option[A]] and ConnectionIO[E] as EitherT[ConnectionIO[?], E, A]
     def \/>[B, E](e: => ConnectionIO[E])(implicit ev: A <:< Option[B]): ConnectionEither[E, B] = EitherT[ConnectionIO[?], E, B] {
       c flatMap { x =>
