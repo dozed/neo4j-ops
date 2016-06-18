@@ -24,7 +24,7 @@ object Queries {
 
     def point[B](b: B): ConnectionIO[B] = result.map(_ => b)
 
-    def single[B:Decoder](key: String): ConnectionIO[B] = unique(parse1[B](key))
+    def single[B:Decoder](key: String): ConnectionIO[B] = unique(Parser.parse[B](key))
 
     def unique[B](implicit parser: Parser[B]): ConnectionIO[B]
 

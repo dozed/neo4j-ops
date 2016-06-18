@@ -24,7 +24,7 @@ object Example1 extends App {
       """.stripMargin, Map("bar" -> bar, "baz" -> baz)).result
   }
 
-  val fooParser: Parser[Foo] = (parse[String]("bar") |@| parse[String]("baz")).tupled.map {
+  val fooParser: Parser[Foo] = (Parser.parse[String]("bar") |@| Parser.parse[String]("baz")).tupled.map {
     case (bar, baz) => Foo(bar, baz)
   }
 

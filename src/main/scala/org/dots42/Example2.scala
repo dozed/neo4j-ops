@@ -79,20 +79,20 @@ object DocumentQueries {
 
   // functor parsing
   val documentParser1: Parser[Document] = {
-    parse3[String, Privacy, String]("id", "privacy", "name").map(Document.tupled)
+    Parser.tuple3[String, Privacy, String]("id", "privacy", "name").map(Document.tupled)
   }
 
   // applicative parsing
   val documentParser: Parser[Document] = {
-    (parse[String]("id") |@| parse[Privacy]("privacy") |@| parse[String]("name"))(Document.apply)
+    (Parser.parse[String]("id") |@| Parser.parse[Privacy]("privacy") |@| Parser.parse[String]("name"))(Document.apply)
   }
 
   // monadic parsing
   val documentParser2: Parser[Document] = {
     for {
-      id <- parse[String]("id")
-      privacy <- parse[Privacy]("privacy")
-      name <- parse[String]("name")
+      id <- Parser.parse[String]("id")
+      privacy <- Parser.parse[Privacy]("privacy")
+      name <- Parser.parse[String]("name")
     } yield Document(id, privacy, name)
   }
 

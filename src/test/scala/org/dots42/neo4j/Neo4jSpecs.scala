@@ -31,7 +31,7 @@ object TestDomainAndQueries {
       |return
       |  f.bar as bar,
       |  f.baz as baz
-    """.stripMargin).list(parse2[String, String]("bar", "baz").map(Foo.tupled))
+    """.stripMargin).list(Parser.tuple2[String, String]("bar", "baz").map(Foo.tupled))
 
 }
 
