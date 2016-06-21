@@ -38,6 +38,7 @@ object Decoders {
     implicit def intDecoder: Decoder[Int] = Decoder.instance[Int] {
       case x: Int => x
       case x: Long => x.toInt
+      case x => x.asInstanceOf[Int]
     }
     implicit def optionalDecoder[A:Decoder]: Decoder[Option[A]] = Decoder.instance[Option[A]] { any =>
       if (any == null) None
