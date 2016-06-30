@@ -84,6 +84,10 @@ object Parsers {
       (parse[A1](k1) |@| parse[A2](k2) |@| parse[A3](k3) |@| parse[A4](k4)).tupled
     }
 
+    def tuple5[A1:Decoder, A2:Decoder, A3:Decoder, A4:Decoder, A5:Decoder](k1: String, k2: String, k3: String, k4: String, k5: String) = {
+      (parse[A1](k1) |@| parse[A2](k2) |@| parse[A3](k3) |@| parse[A4](k4) |@| parse[A5](k5)).tupled
+    }
+
     def tuple6[A1:Decoder, A2:Decoder, A3:Decoder, A4:Decoder, A5:Decoder, A6:Decoder](k1: String, k2: String, k3: String, k4: String, k5: String, k6: String) = {
       (parse[A1](k1) |@| parse[A2](k2) |@| parse[A3](k3) |@| parse[A4](k4) |@| parse[A5](k5) |@| parse[A6](k6)).tupled
     }
