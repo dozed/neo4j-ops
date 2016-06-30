@@ -5,9 +5,7 @@ import org.neo4j.graphdb.{QueryStatistics, Result}
 
 import scala.collection.JavaConversions._
 import scala.collection.generic.CanBuildFrom
-import scala.util.Try
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 
 object Queries {
 
@@ -17,6 +15,8 @@ object Queries {
   trait Query {
 
     def result: ConnectionIO[Result]
+
+    def stats: ConnectionIO[QueryStatistics] = result.map(_.getQueryStatistics)
 
     def unit: ConnectionIO[Unit]
 
@@ -32,10 +32,10 @@ object Queries {
 
     def list[B](implicit parser: Parser[B]): ConnectionIO[List[B]] = to[B, List]
 
-  }
+    def uniqueUnit[B]: ConnectionIO[Unit] = unique[Unit]
+    def uniquePoint[B](b: B): ConnectionIO[B] = uniqueUnit.map(_ => b)
 
-  // TODO
-  // case class ResultChecker(p: QueryStatistics => Boolean)
+  }
 
   def query(text: String, params: Params = Map.empty): Query = new Query {
 
@@ -47,17 +47,20 @@ object Queries {
 
     override def unit: ConnectionIO[Unit] = result map (_ => ())
 
+    def parse1[A](parser: Parser[A], x: Map[String, AnyRef]) = {
+      try {
+        parser.run(x)
+      } catch {
+        case t: Throwable => throw new Error(s"Could not parse: $x", t)
+      }
+    }
+
     override def to[B, F[_]](implicit parser: Parser[B], cbf: CanBuildFrom[Nothing, B, F[B]]): ConnectionIO[F[B]] = {
       result map { r =>
         val builder = cbf.apply()
 
         while (r.hasNext) {
-          val x = r.next.toMap
-          Try {
-            builder += parser.run(x)
-          } recover {
-            case t => println(f"could not parse: $x"); t.printStackTrace()
-          }
+          builder += parse1(parser, r.next.toMap)
         }
 
         builder.result()
@@ -66,9 +69,9 @@ object Queries {
 
     override def unique[B](implicit parser: Parser[B]): ConnectionIO[B] = result map { r =>
       if (r.hasNext) {
-        val b = parser.run(r.next.toMap)
+        val x = r.next.toMap
         if (r.hasNext) throw new Error("Result set is not unique (more than one rows)")
-        b
+        parse1(parser, x)
       }
       else throw new Error("Result set is not unique (empty)")
     }
@@ -76,9 +79,9 @@ object Queries {
     override def option[B](implicit parser: Parser[B]): ConnectionIO[Option[B]] = result map { r =>
       if (r.isEmpty) None
       else {
-        val b = Try(parser.run(r.next.toMap)).toOption
+        val x = r.next.toMap
         if (r.hasNext) throw new Error("Result set is not unique (more than one rows)")
-        b
+        Some(parse1(parser, x))
       }
     }
 
