@@ -15,22 +15,30 @@ object Parsers {
 
   trait ParseGen[I, A]
 
-  case class Parser[A](run: ResultItem => A) extends ParseGen[ResultItem, A]
+  trait Parser[A] extends ParseGen[ResultItem, A] {
+    def run: ResultItem => A
+  }
 
   object Parser extends ParserInstances with TupleParsers {
 
-    def instance[A](run: ResultItem => A): Parser[A] = Parser(run)
+    def apply[A:Parser]: Parser[A] = implicitly[Parser[A]]
 
-    def parse[A: Decoder](key: String): Parser[A] = Parser[A] { m =>
-      implicitly[Decoder[A]].run(m(key))
+    def instance[A](f: ResultItem => A): Parser[A] = new Parser[A] {
+      override def run: (ResultItem) => A = rs => f(rs)
+    }
+
+    def parse[A: Decoder](key: String): Parser[A] = Parser.instance[A](m => Decoder[A].run(m(key)))
+
+    def optional[A: Parser]: Parser[Option[A]] = Parser.instance[Option[A]] { m =>
+      Try(Parser[A].run(m)).toOption
     }
 
   }
 
   implicit val parserMonad = new Monad[Parser] {
-    override def point[A](a: => A): Parser[A] = Parser[A](_ => a)
+    override def point[A](a: => A): Parser[A] = Parser.instance[A](_ => a)
 
-    override def bind[A, B](fa: Parser[A])(f: (A) => Parser[B]): Parser[B] = Parser[B] { res =>
+    override def bind[A, B](fa: Parser[A])(f: (A) => Parser[B]): Parser[B] = Parser.instance[B] { res =>
       val a = fa.run(res)
       val b = f(a).run(res)
       b
@@ -56,14 +64,18 @@ object Parsers {
 
 
   // -> ParseResult and |
-  def parseOrElse[A: Decoder](key: String, default: A): Parser[A] = Parser[A] { m =>
-    Try(implicitly[Decoder[A]].run(m(key))).getOrElse(default)
+  def parseOrElse[A: Decoder](key: String, default: A): Parser[A] = Parser.instance[A] { m =>
+    Try(Decoder[A].run(m(key))).getOrElse(default)
   }
 
   implicit class ParserExt[A](p: Parser[A]) {
-    def |(q: => Parser[A]): Parser[A] = Parser[A] { m =>
+    def |(q: => Parser[A]): Parser[A] = orElse(q)
+
+    def orElse[AA >: A](q: => Parser[AA]): Parser[AA] = Parser.instance[AA] { m =>
       Try(p.run(m)).filter(_ != null).getOrElse(q.run(m))
     }
+
+    def up[AA >: A] = p.map[AA](identity)
   }
 
   trait TupleParsers {

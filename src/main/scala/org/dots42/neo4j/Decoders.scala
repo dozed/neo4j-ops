@@ -1,23 +1,26 @@
 package org.dots42.neo4j
 
+import org.dots42.neo4j.Parsers.ParseGen
+
 import scala.util.Try
 import collection.JavaConversions._
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 
 // Decoder[A] converts from Any to A
 object Decoders {
 
-  trait DecoderGen[I, A] {
-    def run: I => A
+  trait Decoder[A] extends ParseGen[Any, A] {
+    def run: Any => A
   }
-
-  case class Decoder[A](run: Any => A) extends DecoderGen[Any, A]
 
   object Decoder extends DecoderInstances {
 
-    def apply[A:Decoder] = implicitly[Decoder[A]]
+    def apply[A:Decoder]: Decoder[A] = implicitly[Decoder[A]]
 
-    def instance[A](run: Any => A): Decoder[A] = Decoder[A](run)
+    def instance[A](f: Any => A): Decoder[A] = new Decoder[A] {
+      override def run: (Any) => A = any => f(any)
+    }
 
     def byCast[A]: Decoder[A] = Decoder.instance[A](_.asInstanceOf[A])
 
