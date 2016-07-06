@@ -5,9 +5,6 @@ import scalaz._, Scalaz._
 import collection.JavaConversions._
 
 
-// Parser[A] converts from Map[String, Any] to A
-// - decoders
-// - 1-step navigation
 object Parsers {
 
   import Connections._
@@ -16,7 +13,17 @@ object Parsers {
   trait ParseGen[I, A]
 
   trait Parser[A] extends ParseGen[ResultItem, A] {
+
     def run: ResultItem => A
+
+    def upCast[AA >: A]: Parser[AA] = Parser.instance[AA](run)
+
+    def orElse[AA >: A](q: => Parser[AA]): Parser[AA] = Parser.instance[AA] { m =>
+      Try(run(m)).filter(_ != null).getOrElse(q.run(m))
+    }
+
+    def |(q: => Parser[A]): Parser[A] = orElse(q)
+
   }
 
   object Parser extends ParserInstances with TupleParsers {
@@ -29,8 +36,24 @@ object Parsers {
 
     def parse[A: Decoder](key: String): Parser[A] = Parser.instance[A](m => Decoder[A].run(m(key)))
 
+    def down(key: String): Cursor = Cursor(List(key))
+
     def optional[A: Parser]: Parser[Option[A]] = Parser.instance[Option[A]] { m =>
       Try(Parser[A].run(m)).toOption
+    }
+
+  }
+
+  case class Cursor(history: List[String]) {
+
+    def down(key: String): Cursor = Cursor(key :: history)
+
+    def as[A:Parser]: Parser[A] = Parser.instance[A] { m =>
+      Parser[A].run {
+        history.reverse.foldLeft(m) { case (m, key) =>
+          m(key).asInstanceOf[java.util.Map[String, Any]].toMap
+        }
+      }
     }
 
   }
@@ -66,16 +89,6 @@ object Parsers {
   // -> ParseResult and |
   def parseOrElse[A: Decoder](key: String, default: A): Parser[A] = Parser.instance[A] { m =>
     Try(Decoder[A].run(m(key))).getOrElse(default)
-  }
-
-  implicit class ParserExt[A](p: Parser[A]) {
-    def |(q: => Parser[A]): Parser[A] = orElse(q)
-
-    def orElse[AA >: A](q: => Parser[AA]): Parser[AA] = Parser.instance[AA] { m =>
-      Try(p.run(m)).filter(_ != null).getOrElse(q.run(m))
-    }
-
-    def up[AA >: A] = p.map[AA](identity)
   }
 
   trait TupleParsers {
