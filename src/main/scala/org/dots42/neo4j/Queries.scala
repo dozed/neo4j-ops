@@ -80,7 +80,6 @@ object Queries {
       if (r.isEmpty) None
       else {
         val x = r.next.toMap
-        if (r.hasNext) throw new Error("Result set is not unique (more than one rows)")
         Some(parse1(parser, x))
       }
     }
