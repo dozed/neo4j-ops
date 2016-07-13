@@ -12,7 +12,7 @@ object Parsers {
 
   trait ParseGen[I, A]
 
-  trait Parser[A] extends ParseGen[ResultItem, A] {
+  trait Parser[A] extends ParseGen[ResultItem, A] { self =>
 
     def run: ResultItem => A
 
@@ -23,6 +23,12 @@ object Parsers {
     }
 
     def |(q: => Parser[A]): Parser[A] = orElse(q)
+
+    def down(key: String): Parser[A] = Parser.instance[A] { m =>
+      self.run {
+        m(key).asInstanceOf[java.util.Map[String, Any]].toMap
+      }
+    }
 
   }
 
