@@ -80,7 +80,11 @@ object Queries {
       if (r.isEmpty) None
       else {
         val x = r.next.toMap
-        Some(parse1(parser, x))
+        try {
+          Some(parse1(parser, x))
+        } catch {
+          case t: Throwable => None
+        }
       }
     }
 
