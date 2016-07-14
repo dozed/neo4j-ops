@@ -16,6 +16,14 @@ object Parsers {
 
     def run: ResultItem => A
 
+    def attempt(r: ResultItem): Throwable \/ A = {
+      try {
+        run(r).right
+      } catch {
+        case t: Throwable => t.left
+      }
+    }
+
     def upCast[AA >: A]: Parser[AA] = Parser.instance[AA](run)
 
     def orElse[AA >: A](q: => Parser[AA]): Parser[AA] = Parser.instance[AA] { m =>
