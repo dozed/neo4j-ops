@@ -12,6 +12,7 @@ libraryDependencies ++= Seq(
   "org.scalaz" %% "scalaz-core" % "7.2.2",
   "org.scalaz" %% "scalaz-concurrent" % "7.2.2",
   "org.scalaz" %% "scalaz-effect" % "7.2.2",
+  "org.slf4j" % "slf4j-api" % "1.7.13",
   "org.specs2" %% "specs2-core" % "3.6.6" % "test"
 )
 

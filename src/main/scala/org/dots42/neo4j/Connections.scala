@@ -1,9 +1,11 @@
 package org.dots42.neo4j
 
 import org.neo4j.graphdb._
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 import scalaz.concurrent.Task
 
 object Connections {
@@ -12,12 +14,12 @@ object Connections {
 
   type Params = Map[String, Any]
 
+  val log = LoggerFactory.getLogger("org.dots42.neo4j.Connection")
 
   case class Connection(db: GraphDatabaseService) {
     var transaction: Option[Transaction] = None
     var transactionStart: Long = 0L
     var queryCount: Int = 0
-    // val log = LoggerFactory.getLogger("Connection")
   }
 
   // connection AST
@@ -28,17 +30,14 @@ object Connections {
   case class RunQuery(text: String, params: Params) extends ConnectionOp[Result] {
     override def run(c: Connection): Result = {
       c.queryCount += 1
-      //  println()
-      //  println("----------------------------------------------------------------------")
-      //  println("running query")
-      //  println(text)
+      log.debug(s"running query: $text")
       c.db.execute(text, params.asInstanceOf[Map[String, AnyRef]])
     }
   }
 
   case class StartTx() extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      // c.log.info(f"StartTx  running in thread: ${java.lang.Thread.currentThread().getId}")
+      log.debug(f"StartTx (thread: ${java.lang.Thread.currentThread().getId})")
       c.transaction = Some(c.db.beginTx())
       c.transactionStart = System.currentTimeMillis()
     }
@@ -46,7 +45,7 @@ object Connections {
 
   case class SuccessTx() extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      // c.log.info(f"SuccessTx running in thread: ${java.lang.Thread.currentThread().getId}")
+      log.debug(f"SuccessTx (thread: ${java.lang.Thread.currentThread().getId})")
       c.transaction.foreach { tx =>
         tx.success()
       }
@@ -55,7 +54,7 @@ object Connections {
 
   case class FailureTx() extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      // c.log.info(f"FailureTx running in thread: ${java.lang.Thread.currentThread().getId}")
+      log.debug(f"FailureTx (thread: ${java.lang.Thread.currentThread().getId})")
       c.transaction.foreach { tx =>
         tx.failure()
       }
@@ -64,16 +63,15 @@ object Connections {
 
   case class CloseTx() extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      // c.log.info(f"CloseTx running in thread: ${java.lang.Thread.currentThread().getId}")
       val txOpt = c.transaction
       val queryCount = c.queryCount
       val deltaSec = (System.currentTimeMillis() - c.transactionStart).toDouble / 1000.0
+      log.debug(f"CloseTx (thread: ${java.lang.Thread.currentThread().getId}, qps: $queryCount, time: $deltaSec)")
       c.transaction = None
       c.queryCount = 0
       c.transactionStart = 0L
       txOpt.foreach { tx =>
         tx.close()
-        // c.log.info(f"ran $queryCount queries in $deltaSec ms")
       }
     }
   }
