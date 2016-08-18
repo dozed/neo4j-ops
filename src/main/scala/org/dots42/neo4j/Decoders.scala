@@ -48,9 +48,16 @@ object Decoders {
       else Try(implicitly[Decoder[A]].run(any)).toOption.filterNot(_ == null)
     }
 
-    implicit def listDecoder[A:Decoder]: Decoder[List[A]] = Decoder.byCast[java.util.Collection[AnyRef]] map { xs =>
-      val decoder = implicitly[Decoder[A]]
-      xs.toList map decoder.run
+    implicit def listDecoder[A:Decoder]: Decoder[List[A]] = Decoder.instance[List[A]] { xs =>
+
+      if (xs.getClass().isArray()) {
+        val decoder = implicitly[Decoder[A]]
+        xs.asInstanceOf[Array[AnyRef]].toList map decoder.run
+      } else {
+        val decoder = implicitly[Decoder[A]]
+        xs.asInstanceOf[java.util.Collection[AnyRef]].toList map decoder.run
+      }
+
     }
 
   }
