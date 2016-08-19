@@ -36,7 +36,11 @@ object Decoders {
   trait DecoderInstances {
 
     implicit def stringDecoder: Decoder[String] = Decoder.byCast[String]
-    implicit def longDecoder: Decoder[Long] = Decoder.byCast[Long]
+    implicit def longDecoder: Decoder[Long] = Decoder.instance[Long] {
+      case x: Int => x.toLong
+      case x: Long => x
+      case x => x.asInstanceOf[Long]
+    }
     implicit def booleanDecoder: Decoder[Boolean] = Decoder.byCast[Boolean]
     implicit def intDecoder: Decoder[Int] = Decoder.instance[Int] {
       case x: Int => x
