@@ -1,6 +1,7 @@
 package org.dots42.neo4j
 
 import org.dots42.neo4j.Parsers.ParseGen
+import org.neo4j.graphdb.{Node, Relationship}
 
 import scala.util.Try
 import collection.JavaConversions._
@@ -26,14 +27,28 @@ object Decoders {
 
   }
 
-  implicit val decoderFunctor = new Functor[Decoder] {
-    override def map[A, B](fa: Decoder[A])(f: (A) => B): Decoder[B] = Decoder.instance[B](x => f(fa.run(x)))
+
+  implicit val decoderApplicative = new Applicative[Decoder] {
+
+    override def point[A](a: => A): Decoder[A] = new Decoder[A] {
+      override def run: (Any) => A = _ => a
+    }
+
+    override def ap[A, B](fa: => Decoder[A])(f: => Decoder[(A) => B]): Decoder[B] = new Decoder[B] {
+      override def run: (Any) => B = {
+        in => f.run(in)(fa.run(in))
+      }
+    }
+
   }
 
 
 
   // some concrete decoders
   trait DecoderInstances {
+
+    implicit val nodeDecoder = Decoder.byCast[Node]
+    implicit val relationshipDecoder = Decoder.byCast[Relationship]
 
     implicit def stringDecoder: Decoder[String] = Decoder.byCast[String]
     implicit def longDecoder: Decoder[Long] = Decoder.instance[Long] {
@@ -63,6 +78,9 @@ object Decoders {
       }
 
     }
+
+
+    implicit def tuple2Decoder[A:Decoder, B:Decoder]: Decoder[(A, B)] = (Decoder[A] |@| Decoder[B]).tupled
 
   }
 
