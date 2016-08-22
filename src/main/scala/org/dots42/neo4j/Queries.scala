@@ -26,6 +26,8 @@ object Queries {
 
     def single[B:Decoder](key: String): ConnectionIO[B] = unique(Parser.parse[B](key))
 
+    def tuple2[A:Decoder, B:Decoder](key1: String, key2: String): ConnectionIO[(A, B)] = unique(Parser.tuple2[A, B](key1, key2))
+
     def unique[B](implicit parser: Parser[B]): ConnectionIO[B]
 
     def option[B](implicit parser: Parser[B]): ConnectionIO[Option[B]]
