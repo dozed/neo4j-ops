@@ -101,6 +101,10 @@ object Connections {
 
     def lzy[A](a: => A): ConnectionIO[A] = Free.liftF[ConnectionOp, A](a.point[ConnectionOp])
 
+    def delay[A](a: => A): ConnectionIO[A] = Free.liftF[ConnectionOp, A](new ConnectionOp[A] {
+      override def run(c: Connection): A = a
+    })
+
   }
 
 
