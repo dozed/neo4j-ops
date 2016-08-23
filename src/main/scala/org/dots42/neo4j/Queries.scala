@@ -95,6 +95,7 @@ object Queries {
   }
 
 
+  implicit val queryStatisticsShow = Show.showFromToString[QueryStatistics]
 
 
 }
