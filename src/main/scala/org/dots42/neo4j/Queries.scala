@@ -30,6 +30,8 @@ object Queries {
 
     def tuple2Opt[A:Decoder, B:Decoder](key1: String, key2: String): ConnectionIO[Option[(A, B)]] = option(Parser.tuple2[A, B](key1, key2))
 
+    def singleList[A:Decoder](key: String): ConnectionIO[List[A]] = list(Parser.parse[A](key))
+
     def unique[B](implicit parser: Parser[B]): ConnectionIO[B]
 
     def option[B](implicit parser: Parser[B]): ConnectionIO[Option[B]]
