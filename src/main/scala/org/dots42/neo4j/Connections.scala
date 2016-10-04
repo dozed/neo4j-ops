@@ -139,7 +139,7 @@ object Connections {
 
     def transact: Reader[Connection, A] = {
       val p: ConnectionIO[A] = for {
-        tx <- startTx
+        tx <- beginTx
         r <- c
         _ <- successTx(tx)
         _ <- closeTx(tx)
@@ -159,7 +159,7 @@ object Connections {
 
   // ConnectionIO[Result] constructor
   def runQuery(text: String, params: Params): ConnectionIO[org.neo4j.graphdb.Result] = Free.liftF(RunQuery(text, params))
-  def startTx: ConnectionIO[Transaction]   = Free.liftF(BeginTx())
+  def beginTx: ConnectionIO[Transaction]   = Free.liftF(BeginTx())
   def successTx(tx: Transaction): ConnectionIO[Unit] = Free.liftF(SuccessTx(tx))
   def failureTx(tx: Transaction): ConnectionIO[Unit] = Free.liftF(FailureTx(tx))
   def closeTx(tx: Transaction): ConnectionIO[Unit]   = Free.liftF(CloseTx(tx))
