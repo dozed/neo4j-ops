@@ -17,7 +17,6 @@ object Connections {
   val log = LoggerFactory.getLogger("org.dots42.neo4j.Connection")
 
   case class Connection(db: GraphDatabaseService) {
-    var transaction: Option[Transaction] = None
     var transactionStart: Long = 0L
     var queryCount: Int = 0
   }
@@ -35,44 +34,37 @@ object Connections {
     }
   }
 
-  case class StartTx() extends ConnectionOp[Unit] {
-    override def run(c: Connection): Unit = {
+  case class BeginTx() extends ConnectionOp[Transaction] {
+    override def run(c: Connection): Transaction = {
+      val tx = c.db.beginTx()
       log.debug(f"StartTx (thread: ${java.lang.Thread.currentThread().getId})")
-      c.transaction = Some(c.db.beginTx())
       c.transactionStart = System.currentTimeMillis()
+      tx
     }
   }
 
-  case class SuccessTx() extends ConnectionOp[Unit] {
+  case class SuccessTx(tx: Transaction) extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
       log.debug(f"SuccessTx (thread: ${java.lang.Thread.currentThread().getId})")
-      c.transaction.foreach { tx =>
-        tx.success()
-      }
+      tx.success()
     }
   }
 
-  case class FailureTx() extends ConnectionOp[Unit] {
+  case class FailureTx(tx: Transaction) extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
       log.debug(f"FailureTx (thread: ${java.lang.Thread.currentThread().getId})")
-      c.transaction.foreach { tx =>
-        tx.failure()
-      }
+      tx.failure()
     }
   }
 
-  case class CloseTx() extends ConnectionOp[Unit] {
+  case class CloseTx(tx: Transaction) extends ConnectionOp[Unit] {
     override def run(c: Connection): Unit = {
-      val txOpt = c.transaction
       val queryCount = c.queryCount
       val deltaSec = (System.currentTimeMillis() - c.transactionStart).toDouble / 1000.0
       log.debug(f"CloseTx (thread: ${java.lang.Thread.currentThread().getId}, qps: $queryCount, time: $deltaSec)")
-      c.transaction = None
       c.queryCount = 0
       c.transactionStart = 0L
-      txOpt.foreach { tx =>
-        tx.close()
-      }
+      tx.close()
     }
   }
 
@@ -147,10 +139,10 @@ object Connections {
 
     def transact: Reader[Connection, A] = {
       val p: ConnectionIO[A] = for {
-        _ <- startTx
+        tx <- startTx
         r <- c
-        _ <- successTx
-        _ <- closeTx
+        _ <- successTx(tx)
+        _ <- closeTx(tx)
       } yield r
 
       p.foldMap[Reader[Connection, ?]](interp)
@@ -167,9 +159,9 @@ object Connections {
 
   // ConnectionIO[Result] constructor
   def runQuery(text: String, params: Params): ConnectionIO[org.neo4j.graphdb.Result] = Free.liftF(RunQuery(text, params))
-  def startTx: ConnectionIO[Unit]   = Free.liftF(StartTx())
-  def successTx: ConnectionIO[Unit] = Free.liftF(SuccessTx())
-  def failureTx: ConnectionIO[Unit] = Free.liftF(FailureTx())
-  def closeTx: ConnectionIO[Unit]   = Free.liftF(CloseTx())
+  def startTx: ConnectionIO[Transaction]   = Free.liftF(BeginTx())
+  def successTx(tx: Transaction): ConnectionIO[Unit] = Free.liftF(SuccessTx(tx))
+  def failureTx(tx: Transaction): ConnectionIO[Unit] = Free.liftF(FailureTx(tx))
+  def closeTx(tx: Transaction): ConnectionIO[Unit]   = Free.liftF(CloseTx(tx))
 
 }
