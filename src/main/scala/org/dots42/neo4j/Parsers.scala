@@ -38,6 +38,12 @@ object Parsers {
       }
     }
 
+    def toDecoder: Decoder[A] = Decoder.instance[A] {
+      any =>
+        val map = any.asInstanceOf[java.util.Map[String, Any]].toMap
+        self.run(map)
+    }
+
   }
 
   object Parser extends ParserInstances with TupleParsers {
@@ -93,11 +99,7 @@ object Parsers {
 
   }
 
-  implicit def parserDecoder[A](implicit parser: Parser[A]): Decoder[A] = Decoder.instance[A] {
-    any =>
-      val map = any.asInstanceOf[java.util.Map[String, Any]].toMap
-      parser.run(map)
-  }
+  implicit def parserDecoder[A](implicit parser: Parser[A]): Decoder[A] = parser.toDecoder
 
 
   // -> ParseResult and |
