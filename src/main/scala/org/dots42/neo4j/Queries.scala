@@ -41,6 +41,13 @@ object Queries {
     def uniqueUnit[B]: ConnectionIO[Unit] = unique[Unit]
     def uniquePoint[B](b: B): ConnectionIO[B] = uniqueUnit.map(_ => b)
 
+    def require(p: QueryStatistics => Boolean): ConnectionIO[Unit] = {
+      stats.map { s =>
+        if (p(s)) ()
+        else sys.error("query constraint")
+      }
+    }
+
   }
 
   def query(text: String, params: Params = Map.empty): Query = new Query {
