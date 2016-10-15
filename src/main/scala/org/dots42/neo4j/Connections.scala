@@ -68,6 +68,12 @@ object Connections {
     }
   }
 
+  case class ConnectionIOError[A](t: Throwable) extends ConnectionOp[A] {
+    override def run(c: Connection): A = {
+      throw t
+    }
+  }
+
 
   // free/operational monad over AST
   type ConnectionIO[A] = Free[ConnectionOp, A]
@@ -97,6 +103,8 @@ object Connections {
       override def run(c: Connection): A = a
     })
 
+    def fail[A](t: Throwable): ConnectionIO[A]   = Free.liftF(ConnectionIOError(t))
+
   }
 
 
@@ -112,6 +120,15 @@ object Connections {
         ev(x) match {
           case Some(v) => v.right.point[ConnectionIO]
           case None => e.map(_.left)
+        }
+      }
+    }
+
+    def require[B](t: => Throwable)(implicit ev: A <:< Option[B]): ConnectionIO[B] = {
+      c flatMap { x =>
+        ev(x) match {
+          case Some(v) => v.point[ConnectionIO]
+          case None => ConnectionIO.fail(t)
         }
       }
     }
