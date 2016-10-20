@@ -169,6 +169,10 @@ object Connections {
       p.foldMap[Reader[Connection, ?]](interp)
     }
 
+    def attempt: Reader[Connection, Throwable \/ A] = Reader { con =>
+      \/.fromTryCatchNonFatal(transact(con))
+    }
+
     def task(con: Connection): Task[A] = Task(c.transact(con))
 
   }
