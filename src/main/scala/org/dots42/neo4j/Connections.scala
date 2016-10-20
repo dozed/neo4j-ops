@@ -1,6 +1,5 @@
 package org.dots42.neo4j
 
-import org.neo4j.graphdb._
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
@@ -10,8 +9,13 @@ import scalaz.concurrent.Task
 
 object Connections {
 
+  type Node = org.neo4j.graphdb.Node
+  type QueryStatistics = org.neo4j.graphdb.QueryStatistics
+  type Relationship = org.neo4j.graphdb.Relationship
+  type GraphDatabaseService = org.neo4j.graphdb.GraphDatabaseService
+  type Result = org.neo4j.graphdb.Result
+  type Transaction = org.neo4j.graphdb.Transaction
   type ResultItem = Map[String, Any]
-
   type Params = Map[String, Any]
 
   val log = LoggerFactory.getLogger("org.dots42.neo4j.Connection")
@@ -21,7 +25,7 @@ object Connections {
     var queryCount: Int = 0
   }
 
-  // connection AST
+  // connection algebra
   sealed trait ConnectionOp[A] {
     def run(c: Connection): A
   }
