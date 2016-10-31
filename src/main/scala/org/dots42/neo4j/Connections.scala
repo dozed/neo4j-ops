@@ -85,23 +85,7 @@ object Connections {
   implicit val MonadConnectionIO: Monad[ConnectionIO] = Free.freeMonad[ConnectionOp]
 
 
-  implicit val ApplicativeConnectionOp: Applicative[ConnectionOp] = new Applicative[ConnectionOp] {
-
-    override def point[A](a: => A): ConnectionOp[A] = new ConnectionOp[A] {
-      override def run(c: Connection): A = a
-    }
-
-    override def ap[A, B](fa: => ConnectionOp[A])(f: => ConnectionOp[(A) => B]): ConnectionOp[B] = {
-      new ConnectionOp[B] {
-        override def run(c: Connection): B = f.run(c)(fa.run(c))
-      }
-    }
-
-  }
-
   object ConnectionIO {
-
-    def lzy[A](a: => A): ConnectionIO[A] = Free.liftF[ConnectionOp, A](a.point[ConnectionOp])
 
     def delay[A](a: => A): ConnectionIO[A] = Free.liftF[ConnectionOp, A](new ConnectionOp[A] {
       override def run(c: Connection): A = a
