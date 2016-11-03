@@ -33,17 +33,21 @@ object Parsers {
     def |(q: => Parser[A]): Parser[A] = orElse(q)
 
     def down(key: String): Parser[A] = Parser.instance[A] { m =>
-      self.run {
-        m(key).asInstanceOf[java.util.Map[String, Any]].toMap
-      }
+      self.run(toResultItem(m(key)))
     }
 
     def toDecoder: Decoder[A] = Decoder.instance[A] {
       any =>
-        val map = any.asInstanceOf[java.util.Map[String, Any]].toMap
-        self.run(map)
+        self.run(toResultItem(any))
     }
 
+  }
+
+  def toResultItem(a: Any): ResultItem = {
+    a match {
+      case x:java.util.Map[String, Any] => x.toMap
+      case x:Map[String, Any] => x
+    }
   }
 
   object Parser extends ParserInstances with TupleParsers {
@@ -71,7 +75,7 @@ object Parsers {
     def as[A:Parser]: Parser[A] = Parser.instance[A] { m =>
       Parser[A].run {
         history.reverse.foldLeft(m) { case (m, key) =>
-          m(key).asInstanceOf[java.util.Map[String, Any]].toMap
+          toResultItem(m(key))
         }
       }
     }
