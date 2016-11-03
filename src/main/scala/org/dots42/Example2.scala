@@ -1,13 +1,11 @@
 package org.dots42
 
 import org.dots42.Data._
-import org.dots42.WorldTask._
 import org.dots42.neo4j.Connections.{ConnectionIO, Connection}
 import org.dots42.neo4j.Neo4j
 import org.neo4j.graphdb.GraphDatabaseService
 
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 
 // computations are World => Task[A] (fused by Kleisli)
@@ -24,8 +22,8 @@ object Example2 extends App {
   } yield (x, y, z)
 
   val world = World(Neo4j.graphDatabaseService("data/neo4jdb"))
-  val res1 = p1.run(world).run
-  val res2 = p2.run(world).run
+  val res1 = p1.run(world.con)
+  val res2 = p2.run(world.con)
 
   println(res1)
   println(res2)
@@ -38,34 +36,26 @@ case class World(db: GraphDatabaseService) {
 
 }
 
-object WorldTask {
-
-  type WorldTask[A] = Kleisli[Task[?], World, A]
-
-  def task[A](f: World => Task[A]): Kleisli[Task[?], World, A] = Kleisli[Task[?], World, A](f)
-
-}
-
 
 // each function defines a transaction boundary
 object DocumentModule {
 
-  def listDocuments() = task[List[Document]]{ world =>
-    DocumentQueries.listDocuments().task(world.con)
+  def listDocuments() = {
+    DocumentQueries.listDocuments().transact
   }
 
-  def createDocument(name: String, privacy: Privacy) = task[Document] { world =>
-    DocumentQueries.createDocument(name, privacy).task(world.con)
+  def createDocument(name: String, privacy: Privacy) = {
+    DocumentQueries.createDocument(name, privacy).transact
   }
 
-  def listCreateListDocuments(name: String, privacy: Privacy) = task[(List[Document], Document, List[Document])] { world =>
+  def listCreateListDocuments(name: String, privacy: Privacy) = {
     val p: ConnectionIO[(List[Document], Document, List[Document])] = for {
       xs1 <- DocumentQueries.listDocuments()
       doc <- DocumentQueries.createDocument(name, privacy)
       xs2 <- DocumentQueries.listDocuments()
     } yield (xs1, doc, xs2)
 
-    p.task(world.con)
+    p.transact
   }
 
 }

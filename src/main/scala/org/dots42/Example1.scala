@@ -1,10 +1,8 @@
 package org.dots42
 
 import org.dots42.neo4j.Neo4j
-import org.neo4j.graphdb.{Result, GraphDatabaseService}
 
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 object Example1 extends App {
 
@@ -45,9 +43,9 @@ object Example1 extends App {
   val db = Neo4j.graphDatabaseService("data/neo4jdb")
   def con(db: GraphDatabaseService): Connection = Connection(db)
 
-  val t: Task[List[Foo]] = x.task(con(db))
+  val t: Reader[Connection, List[Foo]] = x.transact
 
-  println(t.run)
+  println(t.run(con(db)))
   // List(Foo(hey,ho))
 
 

@@ -3,9 +3,7 @@ package org.dots42.neo4j
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
-import scalaz._
-import Scalaz._
-import scalaz.concurrent.Task
+import scalaz._, Scalaz._
 
 object Connections {
 
@@ -25,7 +23,8 @@ object Connections {
     var queryCount: Int = 0
   }
 
-  // connection algebra
+
+  // input/output operations on a db connection
   sealed trait ConnectionOp[A] {
     def run(c: Connection): A
   }
@@ -79,7 +78,15 @@ object Connections {
   }
 
 
-  // free/operational monad over AST
+  // constructors
+  def runQuery(text: String, params: Params): ConnectionIO[org.neo4j.graphdb.Result] = Free.liftF(RunQuery(text, params))
+  def beginTx: ConnectionIO[Transaction]   = Free.liftF(BeginTx())
+  def successTx(tx: Transaction): ConnectionIO[Unit] = Free.liftF(SuccessTx(tx))
+  def failureTx(tx: Transaction): ConnectionIO[Unit] = Free.liftF(FailureTx(tx))
+  def closeTx(tx: Transaction): ConnectionIO[Unit]   = Free.liftF(CloseTx(tx))
+
+
+  // free/operational monad for connection operations
   type ConnectionIO[A] = Free[ConnectionOp, A]
 
   implicit val MonadConnectionIO: Monad[ConnectionIO] = Free.freeMonad[ConnectionOp]
@@ -96,21 +103,18 @@ object Connections {
   }
 
 
+  val interp: ConnectionOp ~> Reader[Connection, ?] = new (ConnectionOp ~> Reader[Connection, ?]) {
+    override def apply[A](a: ConnectionOp[A]): Reader[Connection, A] = {
+      Reader { con => a.run(con) }
+    }
+  }
+
+
   type ConnectionEither[E, A] = EitherT[ConnectionIO[?], E, A]
 
   implicit class ConnectionIOExt[A](c: ConnectionIO[A]) {
 
     def >>[B](c2: ConnectionIO[B]): ConnectionIO[B] = c flatMap (_ => c2)
-
-    // a ConnectionIO[Option[A]] and ConnectionIO[E] as EitherT[ConnectionIO[?], E, A]
-    def \/>[B, E](e: => ConnectionIO[E])(implicit ev: A <:< Option[B]): ConnectionEither[E, B] = EitherT[ConnectionIO[?], E, B] {
-      c flatMap { x =>
-        ev(x) match {
-          case Some(v) => v.right.point[ConnectionIO]
-          case None => e.map(_.left)
-        }
-      }
-    }
 
     def require[B](t: => Throwable)(implicit ev: A <:< Option[B]): ConnectionIO[B] = {
       c flatMap { x =>
@@ -119,27 +123,6 @@ object Connections {
           case None => ConnectionIO.fail(t)
         }
       }
-    }
-
-
-    // a ConnectionIO[Option[A]] as OptionT[ConnectionIO[?], A]
-    def asOptT[B](implicit ev: A <:< Option[B]): OptionT[ConnectionIO[?], B] = OptionT[ConnectionIO[?], B](c map ev.apply)
-
-    // a ConnectionIO[A] as OptionT[ConnectionIO[?], A]
-    def liftOptT: OptionT[ConnectionIO[?], A] = OptionT[ConnectionIO[?], A](c map (_.some))
-
-  }
-
-
-  val interp: ConnectionOp ~> Reader[Connection, ?] = new (ConnectionOp ~> Reader[Connection, ?]) {
-    override def apply[A](a: ConnectionOp[A]): Reader[Connection, A] = {
-      Reader { con => a.run(con) }
-    }
-  }
-
-  implicit class ConnectionIOExt2[A](c: ConnectionIO[A]) {
-    def right[E]: ConnectionEither[E, A] = EitherT[ConnectionIO[?], E, A] {
-      c.map(x => x.right)
     }
 
     def transact: Reader[Connection, A] = {
@@ -157,20 +140,28 @@ object Connections {
       \/.fromTryCatchNonFatal(transact(con))
     }
 
-    def task(con: Connection): Task[A] = Task(c.transact(con))
+
+    // OptionT
+    def asOptT[B](implicit ev: A <:< Option[B]): OptionT[ConnectionIO[?], B] = OptionT[ConnectionIO[?], B](c map ev.apply)
+
+    def liftOptT: OptionT[ConnectionIO[?], A] = OptionT[ConnectionIO[?], A](c map (_.some))
+
+
+    // EitherT
+    def \/>[B, E](e: => ConnectionIO[E])(implicit ev: A <:< Option[B]): ConnectionEither[E, B] = EitherT[ConnectionIO[?], E, B] {
+      c flatMap { x =>
+        ev(x) match {
+          case Some(v) => v.right.point[ConnectionIO]
+          case None => e.map(_.left)
+        }
+      }
+    }
+
+    def right[E]: ConnectionEither[E, A] = EitherT[ConnectionIO[?], E, A] {
+      c.map(x => x.right)
+    }
 
   }
 
-  // just print the ConnectionOps of the ConnectionIO
-  val printInterpreter: ConnectionIO ~> Id.Id = new (ConnectionIO ~> Id.Id) {
-    override def apply[A](fa: ConnectionIO[A]): Id.Id[A] = ???
-  }
-
-  // ConnectionIO[Result] constructor
-  def runQuery(text: String, params: Params): ConnectionIO[org.neo4j.graphdb.Result] = Free.liftF(RunQuery(text, params))
-  def beginTx: ConnectionIO[Transaction]   = Free.liftF(BeginTx())
-  def successTx(tx: Transaction): ConnectionIO[Unit] = Free.liftF(SuccessTx(tx))
-  def failureTx(tx: Transaction): ConnectionIO[Unit] = Free.liftF(FailureTx(tx))
-  def closeTx(tx: Transaction): ConnectionIO[Unit]   = Free.liftF(CloseTx(tx))
 
 }
