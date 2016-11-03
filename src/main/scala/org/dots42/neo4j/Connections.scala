@@ -112,12 +112,19 @@ object Connections {
 
   type ConnectionEither[E, A] = EitherT[ConnectionIO[?], E, A]
 
-  implicit class ConnectionIOExt[A](c: ConnectionIO[A]) {
+  implicit class ConnectionIOExt[A](fa: ConnectionIO[A]) {
 
-    def >>[B](c2: ConnectionIO[B]): ConnectionIO[B] = c flatMap (_ => c2)
+    def withFilter(p: A => Boolean): ConnectionIO[A] = {
+      fa.flatMap { a =>
+        if (p(a)) fa
+        else ConnectionIO.fail(new RuntimeException("filter"))
+      }
+    }
+
+    def >>[B](c2: ConnectionIO[B]): ConnectionIO[B] = fa.flatMap(_ => c2)
 
     def require[B](t: => Throwable)(implicit ev: A <:< Option[B]): ConnectionIO[B] = {
-      c flatMap { x =>
+      fa.flatMap { x =>
         ev(x) match {
           case Some(v) => v.point[ConnectionIO]
           case None => ConnectionIO.fail(t)
@@ -128,7 +135,7 @@ object Connections {
     def transact: Reader[Connection, A] = {
       val p: ConnectionIO[A] = for {
         tx <- beginTx
-        r <- c
+        r <- fa
         _ <- successTx(tx)
         _ <- closeTx(tx)
       } yield r
@@ -142,14 +149,14 @@ object Connections {
 
 
     // OptionT
-    def asOptT[B](implicit ev: A <:< Option[B]): OptionT[ConnectionIO[?], B] = OptionT[ConnectionIO[?], B](c map ev.apply)
+    def asOptT[B](implicit ev: A <:< Option[B]): OptionT[ConnectionIO[?], B] = OptionT[ConnectionIO[?], B](fa.map(ev))
 
-    def liftOptT: OptionT[ConnectionIO[?], A] = OptionT[ConnectionIO[?], A](c map (_.some))
+    def liftOptT: OptionT[ConnectionIO[?], A] = OptionT[ConnectionIO[?], A](fa.map(_.some))
 
 
     // EitherT
     def \/>[B, E](e: => ConnectionIO[E])(implicit ev: A <:< Option[B]): ConnectionEither[E, B] = EitherT[ConnectionIO[?], E, B] {
-      c flatMap { x =>
+      fa.flatMap { x =>
         ev(x) match {
           case Some(v) => v.right.point[ConnectionIO]
           case None => e.map(_.left)
@@ -158,7 +165,7 @@ object Connections {
     }
 
     def right[E]: ConnectionEither[E, A] = EitherT[ConnectionIO[?], E, A] {
-      c.map(x => x.right)
+      fa.map(x => x.right)
     }
 
   }
