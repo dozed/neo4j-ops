@@ -28,13 +28,13 @@ object Queries {
 
     def point[A](a: A): ConnectionIO[A] = result.map(_ => a)
 
-    def unique[A](implicit parser: Parser[A]): ConnectionIO[A]
+    def unique[A:Parser]: ConnectionIO[A]
 
-    def option[A](implicit parser: Parser[A]): ConnectionIO[Option[A]]
+    def option[A:Parser]: ConnectionIO[Option[A]]
 
-    def list[A](implicit parser: Parser[A]): ConnectionIO[List[A]] = to[A, List]
+    def list[A:Parser]: ConnectionIO[List[A]] = to[A, List]
 
-    def to[A, F[_]](implicit parser: Parser[A], cbf: CanBuildFrom[Nothing, A, F[A]]): ConnectionIO[F[A]]
+    def to[A:Parser, F[_]](implicit cbf: CanBuildFrom[Nothing, A, F[A]]): ConnectionIO[F[A]]
 
     def single[A:Decoder](key: String): ConnectionIO[A] = unique(Parser.parse[A](key))
 
@@ -56,7 +56,7 @@ object Queries {
 
     override def unit: ConnectionIO[Unit] = result map (_ => ())
 
-    def parse1[A](parser: Parser[A], item: Map[String, AnyRef]) = {
+    def parse1[A](item: Map[String, AnyRef])(implicit parser: Parser[A]) = {
       try {
         parser.run(item)
       } catch {
@@ -64,33 +64,33 @@ object Queries {
       }
     }
 
-    override def to[A, F[_]](implicit parser: Parser[A], cbf: CanBuildFrom[Nothing, A, F[A]]): ConnectionIO[F[A]] = {
+    override def to[A:Parser, F[_]](implicit cbf: CanBuildFrom[Nothing, A, F[A]]): ConnectionIO[F[A]] = {
       result map { r =>
         val builder = cbf.apply()
 
         while (r.hasNext) {
-          builder += parse1(parser, r.next.toMap)
+          builder += parse1(r.next.toMap)
         }
 
         builder.result()
       }
     }
 
-    override def unique[A](implicit parser: Parser[A]): ConnectionIO[A] = result map { r =>
+    override def unique[A:Parser]: ConnectionIO[A] = result map { r =>
       if (r.hasNext) {
         val x = r.next.toMap
         if (r.hasNext) throw new RuntimeException("Result set is not unique (more than one rows)")
-        parse1(parser, x)
+        parse1(x)
       }
       else throw new RuntimeException("Result set is not unique (empty)")
     }
 
-    override def option[A](implicit parser: Parser[A]): ConnectionIO[Option[A]] = result map { r =>
+    override def option[A:Parser]: ConnectionIO[Option[A]] = result map { r =>
       if (r.isEmpty) None
       else {
         val x = r.next.toMap
         try {
-          Some(parse1(parser, x))
+          Some(parse1(x))
         } catch {
           case t: Throwable => None
         }
