@@ -94,11 +94,13 @@ object Connections {
 
   object ConnectionIO {
 
+    def pure[A](a: A): ConnectionIO[A] = Free.pure(a)
+
     def delay[A](a: => A): ConnectionIO[A] = Free.liftF[ConnectionOp, A](new ConnectionOp[A] {
       override def run(c: Connection): A = a
     })
 
-    def fail[A](t: Throwable): ConnectionIO[A]   = Free.liftF(ConnectionIOError(t))
+    def fail[A](t: Throwable): ConnectionIO[A] = Free.liftF(ConnectionIOError(t))
 
   }
 
