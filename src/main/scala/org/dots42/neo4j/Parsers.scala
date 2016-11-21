@@ -66,6 +66,9 @@ object Parsers {
       Try(Parser[A].run(m)).toOption
     }
 
+    def list[A:Parser]: Parser[List[A]] =
+      Parser.instance[List[A]](res => Decoder.listDecoder[A](Parser[A].toDecoder).run(res))
+
   }
 
   case class Cursor(history: List[String]) {
