@@ -58,6 +58,10 @@ object Parsers {
       override def run: (ResultItem) => A = rs => f(rs)
     }
 
+    def const[A](a: A): Parser[A] = new Parser[A] {
+      override def run: (ResultItem) => A = _ => a
+    }
+
     def parse[A: Decoder](key: String): Parser[A] = Parser.instance[A](m => Decoder[A].run(m(key)))
 
     def down(key: String): Cursor = Cursor(List(key))
@@ -66,8 +70,11 @@ object Parsers {
       Try(Parser[A].run(m)).toOption
     }
 
-    def list[A:Parser]: Parser[List[A]] =
-      Parser.instance[List[A]](res => Decoder.listDecoder[A](Parser[A].toDecoder).run(res))
+    def list[A:Parser](key: String): Parser[List[A]] =
+      Parser.instance[List[A]] {
+        res =>
+          Decoder.listDecoder[A](Parser[A].toDecoder).run(res(key))
+      }
 
   }
 
