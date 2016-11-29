@@ -16,7 +16,7 @@ object Connections {
   type ResultItem = Map[String, Any]
   type Params = Map[String, Any]
 
-  val log = LoggerFactory.getLogger("org.dots42.neo4j.Connection")
+  private[this] val log = LoggerFactory.getLogger("org.dots42.neo4j.Connection")
 
   case class Connection(db: GraphDatabaseService) {
     var transactionStart: Long = 0L
