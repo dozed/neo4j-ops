@@ -41,6 +41,10 @@ object Parsers {
         self.run(toResultItem(any))
     }
 
+    def toOption: Parser[Option[A]] = new Parser[Option[A]] {
+      override def run = res => Try(self.run(res)).toOption
+    }
+
   }
 
   def toResultItem(a: Any): ResultItem = {

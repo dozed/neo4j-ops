@@ -25,10 +25,12 @@ object Decoders {
 
     def byCast[A]: Decoder[A] = Decoder.instance[A](_.asInstanceOf[A])
 
+    def decodeBy[A:Decoder, B](f: A => B): Decoder[B] = Decoder[A].map(a => f(a))
+
   }
 
 
-  implicit val decoderApplicative = new Applicative[Decoder] {
+  implicit lazy val decoderApplicative = new Applicative[Decoder] {
 
     override def point[A](a: => A): Decoder[A] = new Decoder[A] {
       override def run: (Any) => A = _ => a
