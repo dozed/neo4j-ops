@@ -118,7 +118,15 @@ object Connections {
 
     def withFilter(p: A => Boolean): ConnectionIO[A] = {
       fa.flatMap { a =>
-        if (p(a)) fa
+        if (p(a)) ConnectionIO.pure(a)
+        else ConnectionIO.fail(new RuntimeException("withFilter"))
+      }
+    }
+
+
+    def filter(p: A => Boolean): ConnectionIO[A] = {
+      fa.flatMap { a =>
+        if (p(a)) ConnectionIO.pure(a)
         else ConnectionIO.fail(new RuntimeException("filter"))
       }
     }
