@@ -18,7 +18,7 @@ object Queries {
     def require(p: QueryStatistics => Boolean): ConnectionIO[Result] = {
       result.map { res =>
         if (p(res.getQueryStatistics)) res
-        else throw new RuntimeException("result constraint")
+        else throw new RuntimeException(s"result constraint: ${res.getQueryStatistics.shows}")
       }
     }
 
@@ -100,7 +100,11 @@ object Queries {
   }
 
 
-  implicit val queryStatisticsShow = Show.showFromToString[QueryStatistics]
+  implicit lazy val queryStatisticsShow = Show.shows[QueryStatistics] { s =>
+
+    s"QueryStatistics( nc: ${s.getNodesCreated}, nd: ${s.getNodesDeleted}, rc: ${s.getRelationshipsCreated}, rd: ${s.getRelationshipsDeleted}, ps: ${s.getPropertiesSet} )"
+
+  }
 
 
 }
