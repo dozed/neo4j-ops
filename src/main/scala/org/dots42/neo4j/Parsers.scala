@@ -68,6 +68,13 @@ object Parsers {
 
     def parse[A: Decoder](key: String): Parser[A] = Parser.instance[A](m => Decoder[A].run(m(key)))
 
+    def parseOpt[A: Decoder](key: String): Parser[Option[A]] =
+      Parser.instance[Option[A]](
+        m =>
+          // key can be missing, or decoder can fail
+          Try(Decoder[A].run(m(key))).toOption
+      )
+
     def down(key: String): Cursor = Cursor(List(key))
 
     def optional[A: Parser]: Parser[Option[A]] = Parser.instance[Option[A]] { m =>
