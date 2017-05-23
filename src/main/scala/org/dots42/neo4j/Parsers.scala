@@ -14,6 +14,7 @@ object Parsers {
 
   trait Parser[A] extends ParseGen[ResultItem, A] { self =>
 
+    // TODO ParseResult
     def run: ResultItem => A
 
     def attempt(r: ResultItem): Throwable \/ A = {
@@ -58,12 +59,12 @@ object Parsers {
 
     def apply[A:Parser]: Parser[A] = implicitly[Parser[A]]
 
+    def const[A](a: A) = Parser.instance[A](_ => a)
+
+    def pure[A](a: A) = Parser.instance[A](_ => a)
+
     def instance[A](f: ResultItem => A): Parser[A] = new Parser[A] {
       override def run: (ResultItem) => A = rs => f(rs)
-    }
-
-    def const[A](a: A): Parser[A] = new Parser[A] {
-      override def run: (ResultItem) => A = _ => a
     }
 
     def parse[A: Decoder](key: String): Parser[A] = Parser.instance[A](m => Decoder[A].run(m(key)))
@@ -72,8 +73,12 @@ object Parsers {
       Parser.instance[Option[A]](
         m =>
           // key can be missing, or decoder can fail
-          Try(Decoder[A].run(m(key))).toOption
+          Try(Decoder[A].run(m(key))).filter(_ != null).toOption
       )
+
+    def parseOrElse[A: Decoder](key: String, default: A): Parser[A] = Parser.instance[A] { m =>
+      parseOpt(key).run(m).getOrElse(default)
+    }
 
     def down(key: String): Cursor = Cursor(List(key))
 
@@ -127,7 +132,7 @@ object Parsers {
   implicit def parserDecoder[A](implicit parser: Parser[A]): Decoder[A] = parser.toDecoder
 
 
-  // -> ParseResult and |
+  // TODO remove
   def parseOrElse[A: Decoder](key: String, default: A): Parser[A] = Parser.instance[A] { m =>
     Try(Decoder[A].run(m(key))).getOrElse(default)
   }
