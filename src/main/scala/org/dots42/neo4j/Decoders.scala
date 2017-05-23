@@ -12,7 +12,15 @@ import Scalaz._
 object Decoders {
 
   trait Decoder[A] extends ParseGen[Any, A] {
+
     def run: Any => A
+
+    def nonNull: Decoder[A] = Decoder.instance[A] { any =>
+      val a = run(any)
+      if (a == null) throw new RuntimeException("Unexpected null")
+      else a
+    }
+
   }
 
   object Decoder extends DecoderInstances {
@@ -56,13 +64,11 @@ object Decoders {
     implicit def longDecoder: Decoder[Long] = Decoder.instance[Long] {
       case x: Int => x.toLong
       case x: Long => x
-      case x => x.asInstanceOf[Long]
     }
     implicit def booleanDecoder: Decoder[Boolean] = Decoder.byCast[Boolean]
     implicit def intDecoder: Decoder[Int] = Decoder.instance[Int] {
       case x: Int => x
       case x: Long => x.toInt
-      case x => x.asInstanceOf[Int]
     }
     implicit def optionalDecoder[A:Decoder]: Decoder[Option[A]] = Decoder.instance[Option[A]] { any =>
       if (any == null) None
