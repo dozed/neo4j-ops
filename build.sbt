@@ -11,7 +11,7 @@ libraryDependencies ++= Seq(
   "org.neo4j" % "neo4j-shell" % "2.3.2",
   "org.scalaz" %% "scalaz-core" % "7.2.2",
   "org.slf4j" % "slf4j-api" % "1.7.13",
-  "org.specs2" %% "specs2-core" % "3.6.6" % "test"
+  "org.specs2" %% "specs2-core" % "3.8.9" % "test"
 )
 
 exportJars := true

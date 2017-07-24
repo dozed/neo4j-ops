@@ -8,7 +8,6 @@ import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 object TestDomainAndQueries {
 
