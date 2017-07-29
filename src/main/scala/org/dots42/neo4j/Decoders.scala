@@ -80,6 +80,9 @@ object Decoders {
       if (xs.getClass().isArray()) {
         val decoder = implicitly[Decoder[A]]
         xs.asInstanceOf[Array[AnyRef]].toList map decoder.run
+      } else if (xs.isInstanceOf[List[A]]) {
+        val decoder = implicitly[Decoder[A]]
+        xs.asInstanceOf[List[AnyRef]] map decoder.run
       } else {
         val decoder = implicitly[Decoder[A]]
         xs.asInstanceOf[java.util.Collection[AnyRef]].toList map decoder.run
